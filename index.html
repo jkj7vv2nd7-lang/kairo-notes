@@ -266,7 +266,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.9.0";
+const APP_VER = "1.10.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -373,6 +373,7 @@ const STR = {
   tr_apply: ["本文に取り込む", "Apply to text"], tr_failed: ["英訳できませんでした：", "Translation failed: "],
   tb_bold: ["太字", "Bold"], tb_head: ["見出し", "Heading"], tb_list: ["リスト", "List"],
   tb_numlist: ["番号リスト", "Numbered"], tb_link: ["リンク", "Link"], tb_quote: ["引用", "Quote"],
+  tb_date: ["日付", "Date"], tb_time: ["時刻", "Time"],
   tb_code: ["コード", "Code"], tb_check: ["チェック", "Check"],
   sort_label: ["並び替え", "Sort"], sort_updated: ["更新順", "Recently updated"],
   sort_created: ["作成順", "Recently created"], sort_title: ["タイトル順", "Title"],
@@ -389,6 +390,18 @@ const STR = {
   cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
   cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
   book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  tpl_on: ["📐 型に登録", "📐 Save as template"], tpl_off: ["📐 型を解除", "📐 Remove template"],
+  tpl_from: ["型から作る", "From a template"],
+  tpl_settings_title: ["📐 型（テンプレート）", "📐 Templates"],
+  tpl_settings_lead: ["型の登録は、ノートの編集画面のボタンから行います。ここでは登録済みの型を消せます。", "Register a template from a note's editor. Here you can remove registered templates."],
+  tpl_none: ["登録されている型はまだありません。", "No templates yet."],
+  sum_btn: ["✨ 要約・タイトル案", "✨ Summary & titles"], sum_title: ["✨ 要約とタイトル案", "✨ Summary & title ideas"],
+  sum_lead: ["AIが下書きを作ります。入れるかどうかは、内容を見てから決められます。", "The AI drafts a summary and title ideas. Nothing is applied until you choose."],
+  sum_summary_label: ["要約（直せます）", "Summary (editable)"], sum_titles_label: ["タイトル案", "Title ideas"],
+  sum_insert: ["要約を冒頭に入れる", "Insert summary at the top"], sum_use_title: ["このタイトルにする", "Use this title"],
+  sum_rerun: ["もう一度作る", "Generate again"], sum_busy: ["AIが考えています…", "The AI is thinking…"],
+  sum_empty: ["うまく作れませんでした。もう一度お試しください。", "Could not generate it. Please try again."],
+  sum_inserted: ["要約を冒頭に入れました。", "Summary inserted at the top."], sum_title_done: ["タイトルを差し替えました。", "Title replaced."],
   cmp_title: ["📚 テーマ別まとめ書き出し", "📚 Compilation export"],
   cmp_lead: ["タグや個別の選択でノートを選び、目次つきの1つの文書にまとめて書き出します。人が読むための清書形式です（AIへの受け渡しとは別の機能です）。", "Pick notes by tag or individually and export them as one document with a table of contents, formatted for reading (separate from the AI handoff)."],
   cmp_by_tag: ["タグで選ぶ（タップでまとめて選択）", "Pick by tag (tap to select all)"], cmp_notes: ["ノートを選ぶ", "Choose notes"],
@@ -1037,6 +1050,8 @@ function editorHtml(n){
           <button onpointerdown="mdPress(event, 'quote')">&gt; ${t("tb_quote")}</button>
           <button onpointerdown="mdPress(event, 'link')">🔗 ${t("tb_link")}</button>
           <button onpointerdown="mdPress(event, 'code')">&lt;/&gt; ${t("tb_code")}</button>
+          <button onpointerdown="mdPress(event, 'date')">📅 ${t("tb_date")}</button>
+          <button onpointerdown="mdPress(event, 'time')">🕐 ${t("tb_time")}</button>
         </div>
         <textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
       : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
@@ -1056,6 +1071,8 @@ function editorHtml(n){
       <button class="btn sub" onclick="openTranslate()">${t("translate_btn")}</button>
       <button class="btn sub" onclick="openQuestions()">${t("q_btn")}</button>
       <button class="btn sub" onclick="printNote('${n.id}')">${t("prt_btn")}</button>
+      <button class="btn sub" onclick="toggleTemplate('${n.id}')">${templateOf(n.id) ? t("tpl_off") : t("tpl_on")}</button>
+      ${aiReady() ? `<button class="btn sub" onclick="openSummary()">${t("sum_btn")}</button>` : ""}
     </div>
   </div>
   <div class="card outline">
@@ -1943,8 +1960,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -1962,6 +1979,11 @@ function settingsViewHtml(){
     <p class="small">${t("disp_note")}</p>
   </div>
   ${aiSettingsCardHtml()}
+  <div class="card">
+    <h2>${t("tpl_settings_title")}</h2>
+    <p class="small">${t("tpl_settings_lead")}</p>
+    ${templates.length ? templates.map(tp => `<div class="relrow"><div class="relmain"><b>${esc(tp.name)}</b></div><button class="mini warn" onclick="removeTemplate('${tp.tid}')">${t("delete_btn")}</button></div>`).join("") : `<p class="small">${t("tpl_none")}</p>`}
+  </div>
   ${FS_OK ? `<div class="card">
     <h2>${t("folder_title")}</h2>
     <p class="small">${t("folder_desc")}</p>
@@ -1992,6 +2014,19 @@ function settingsViewHtml(){
   </div>`;
 }
 /* ============ 第8期：Markdown入力支援 ============ */
+function todayText(){
+  const d = new Date();
+  if(LANG === "ja") return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+  const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return names[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+function timeText(){
+  const d = new Date();
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  if(LANG === "ja") return d.getHours() + "時" + mm + "分";
+  let h = d.getHours(); const ap = h < 12 ? "AM" : "PM"; h = h % 12 || 12;
+  return h + ":" + mm + " " + ap;
+}
 function mdPress(ev, kind){
   ev.preventDefault();
   const ta = document.getElementById("edBody");
@@ -2012,7 +2047,11 @@ function mdPress(ev, kind){
     out = v.slice(0, ls) + joined + v.slice(le);
     ns = ls; ne = ls + joined.length;
   };
-  if(kind === "bold") wrap("**", "**", LANG === "en" ? "bold text" : "太字");
+  if(kind === "date" || kind === "time"){
+    const ins = kind === "date" ? todayText() : timeText();
+    out = v.slice(0, s) + ins + v.slice(e); ns = ne = s + ins.length;
+  }
+  else if(kind === "bold") wrap("**", "**", LANG === "en" ? "bold text" : "太字");
   else if(kind === "code"){
     if(sel.includes("\n")) wrap("```\n", "\n```", "");
     else wrap("`", "`", LANG === "en" ? "code" : "コード");
@@ -2603,12 +2642,157 @@ async function fsImport(){
   }catch(e){ fsMsg("読み込みに失敗しました：" + (e && e.message ? e.message : e)); }
 }
 /* ============ 作成メニュー（テキスト／手書き／音声） ============ */
+/* ============ 型（テンプレート）（第11期） ============ */
+let templates = [];
+async function loadTemplates(){
+  const v = await metaGet("templates", []);
+  templates = Array.isArray(v) ? v : [];
+}
+function templateOf(id){ return templates.find(x => x.srcId === id) || null; }
+async function deleteTplImages(tid){
+  const imgRows = await idbAll("images");
+  for(const r of imgRows) if(r.noteId === "tpl:" + tid){ await idbDel("images", r.id); delete imgCache[r.id]; }
+}
+async function toggleTemplate(id){
+  const n = getNote(id); if(!n) return;
+  const existing = templateOf(id);
+  if(existing){
+    await deleteTplImages(existing.tid);
+    templates = templates.filter(x => x.tid !== existing.tid);
+  }else{
+    const tid = uid();
+    let body = n.body;
+    const imgRows = await idbAll("images");
+    for(const r of imgRows){
+      if(r.noteId === id){
+        const nid = uid();
+        await idbPut("images", { id: nid, noteId: "tpl:" + tid, dataUrl: r.dataUrl, created: nowIso() });
+        imgCache[nid] = r.dataUrl;
+        body = body.split("kairo-img:" + r.id).join("kairo-img:" + nid);
+      }
+    }
+    templates.push({ tid, srcId: id, name: n.fm.title, body, tags: n.fm.tags.slice(), status: n.fm.status });
+  }
+  await metaSet("templates", templates);
+  render();
+}
+async function removeTemplate(tid){
+  await deleteTplImages(tid);
+  templates = templates.filter(x => x.tid !== tid);
+  await metaSet("templates", templates);
+  render();
+}
+async function createFromTemplate(tid){
+  const tp = templates.find(x => x.tid === tid); if(!tp) return;
+  const t = nowIso();
+  const c = { id: uid(), fm: { title: tp.name, tags: (tp.tags || []).slice(), status: tp.status || "idea", created: t, updated: t }, body: tp.body };
+  const imgRows = await idbAll("images");
+  for(const r of imgRows){
+    if(r.noteId === "tpl:" + tid){
+      const nid = uid();
+      await idbPut("images", { id: nid, noteId: c.id, dataUrl: r.dataUrl, created: nowIso() });
+      imgCache[nid] = r.dataUrl;
+      c.body = c.body.split("kairo-img:" + r.id).join("kairo-img:" + nid);
+    }
+  }
+  notes.push(c);
+  await idbPut("notes", { id: c.id, md: noteToMd(c) });
+  closeModal();
+  currentId = c.id; view = "doc"; edMode = "edit"; render();
+}
+/* ============ AI要約・タイトル案（第11期） ============ */
+let sumState = null;
+function openSummary(){
+  const n = currentId ? getNote(currentId) : null; if(!n) return;
+  sumState = { noteId: n.id, summary: "", titles: [], busy: false, msg: "" };
+  renderSummaryModal();
+  sumRun();
+}
+function renderSummaryModal(){
+  const s = sumState; if(!s) return;
+  openModal(`<h2>${t("sum_title")}</h2>
+  <p class="small">${t("sum_lead")}</p>
+  ${s.busy ? `<p class="small">${t("sum_busy")}</p>` : ""}
+  ${s.summary ? `<label class="flabel">${t("sum_summary_label")}</label>
+    <textarea class="ed" id="sumText" style="min-height:110px">${esc(s.summary)}</textarea>
+    <div class="btnrow"><button class="btn" onclick="sumApplySummary()">${t("sum_insert")}</button></div>` : ""}
+  ${s.titles.length ? `<label class="flabel">${t("sum_titles_label")}</label>` + s.titles.map((x, i) => `<div class="relrow"><div class="relmain">${esc(x)}</div><button class="mini" onclick="sumApplyTitle(${i})">${t("sum_use_title")}</button></div>`).join("") : ""}
+  ${s.msg ? `<div class="msg">${esc(s.msg)}</div>` : ""}
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn sub" onclick="sumRun()" ${s.busy ? "disabled" : ""}>${t("sum_rerun")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function sumRun(){
+  const s = sumState; if(!s || s.busy) return;
+  const n = getNote(s.noteId); if(!n) return;
+  s.busy = true; s.msg = ""; renderSummaryModal();
+  const prompt = "You are helping organize a note. Read the following note and reply with ONLY a JSON object (no code fences, no commentary) in this exact shape: {\"summary\": \"...\", \"titles\": [\"...\", \"...\", \"...\"]}. The summary must be written in the same language as the note, in 2 to 3 short lines, capturing what the note is about. The titles are 3 alternative title suggestions in the same language, each short.\n\nTitle: " + n.fm.title + "\n\n" + n.body.slice(0, 3000);
+  const w = startAiWait();
+  try{
+    const raw = await aiAsk(prompt);
+    let summary = "", titles = [];
+    try{
+      const j = JSON.parse(String(raw).replace(/\`\`\`json/g, "").replace(/\`\`\`/g, "").trim());
+      summary = String(j.summary || "").trim();
+      titles = Array.isArray(j.titles) ? j.titles.map(x => String(x).trim()).filter(Boolean).slice(0, 5) : [];
+    }catch(e){ summary = String(raw || "").trim(); }
+    s.summary = summary; s.titles = titles;
+    if(!summary && !titles.length) s.msg = t("sum_empty");
+  }catch(err){
+    stopAiWait();
+    s.busy = false;
+    s.msg = aiWaitCancelled(w) ? t("wait_stopped") : aiErrText(err);
+    if(sumState === s) renderSummaryModal();
+    return;
+  }
+  stopAiWait();
+  s.busy = false;
+  if(sumState === s) renderSummaryModal();
+}
+function insertSummaryBlock(body, block){
+  const lines = body.split("\n");
+  let start = 0;
+  if(lines[0] && /^#\s/.test(lines[0])){ start = 1; if(lines[start] === "") start++; }
+  const labelRe = /^> \*\*(要約|Summary)\*\*[：:]/;
+  if(lines[start] && labelRe.test(lines[start])){
+    let j = start;
+    while(j < lines.length && /^>/.test(lines[j])) j++;
+    lines.splice(start, j - start, ...block.split("\n"));
+    return lines.join("\n");
+  }
+  lines.splice(start, 0, ...block.split("\n"), "");
+  return lines.join("\n");
+}
+function sumApplySummary(){
+  const s = sumState; if(!s) return;
+  const n = getNote(s.noteId); if(!n) return;
+  const ta = document.getElementById("sumText");
+  const raw = (ta ? ta.value : s.summary).split("\n").map(x => x.trim()).filter(Boolean);
+  if(!raw.length) return;
+  const label = LANG === "ja" ? "要約" : "Summary";
+  const block = raw.map((x, i) => "> " + (i === 0 ? "**" + label + "**：" : "") + x).join("\n");
+  n.body = insertSummaryBlock(n.body, block);
+  dirtyIds.add(n.id); scheduleSave();
+  s.msg = t("sum_inserted");
+  renderSummaryModal(); renderEditor(); renderNoteList();
+}
+function sumApplyTitle(i){
+  const s = sumState; if(!s) return;
+  const n = getNote(s.noteId); if(!n) return;
+  const title = s.titles[i]; if(!title) return;
+  n.fm.title = title;
+  dirtyIds.add(n.id); scheduleSave();
+  s.msg = t("sum_title_done");
+  renderSummaryModal(); renderEditor(); renderNoteList();
+}
 function openCreateMenu(){
   openModal(`<h2>${t("create_title")}</h2>
   <div class="btnrow" style="flex-direction:column;">
     <button class="btn" onclick="closeModal(); newNote();">${t("create_text")}</button>
     <button class="btn sub" onclick="openPad('new')">${t("create_ink")}</button>
     <button class="btn sub" onclick="openVoice()">${t("create_voice")}</button>
+    ${templates.length ? `<label class="flabel">${t("tpl_from")}</label>` + templates.map(tp => `<button class="btn sub" onclick="createFromTemplate('${tp.tid}')">📐 ${esc(tp.name)}</button>`).join("") : ""}
     <button class="btn ghost" onclick="closeModal()">閉じる</button>
   </div>
   <p class="small">${t("create_note")}</p>`);
@@ -3009,6 +3193,7 @@ async function boot(){
   canvasPos = await metaGet("canvasPos", {});
   mapPos = await metaGet("mapPos", {});
   await loadPins();
+  await loadTemplates();
   applyFs();
   applyStaticLang();
   await loadSnaps();
