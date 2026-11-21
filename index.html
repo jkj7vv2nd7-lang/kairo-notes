@@ -220,6 +220,18 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .waitcard .brandanim .bn{ fill:#efeafd; }
 .waittitle{ font-size:17px; font-weight:700; }
 .waittip{ font-size:13.5px; color:var(--muted); line-height:1.6; min-height:44px; }
+
+#printArea{ display:none; }
+@media print{
+  body.printing-note header.top, body.printing-note main, body.printing-note footer, body.printing-note .bottombar,
+  body.printing-note #modalRoot, body.printing-note #focusRoot, body.printing-note #waitRoot{ display:none !important; }
+  body.printing-note #printArea{ display:block !important; }
+  #printArea .prt-head h1{ font-size:20pt; margin:0 0 4pt; line-height:1.4; }
+  #printArea .prt-date{ font-size:10pt; color:#555; margin-bottom:14pt; }
+  #printArea .preview{ background:none; border:none; padding:0; min-height:0; font-size:12pt; line-height:1.9; }
+  #printArea .preview img{ max-width:100%; }
+  @page{ size:A4; margin:18mm; }
+}
 </style>
 </head>
 <body>
@@ -242,9 +254,10 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="modalRoot"></div>
 <div id="focusRoot"></div>
 <div id="waitRoot"></div>
+<div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.7.1";
+const APP_VER = "1.8.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -364,6 +377,15 @@ const STR = {
   q_need_ai: ["問いかけにはAI接続が必要です", "Questions need an AI connection"],
   q_need_ai_desc: ["AI「問いかけ」は任意機能です。設定でAI接続をONにして、ご自身のAPIキー（またはOllama）を設定すると使えます。キーはこの端末の中にだけ保存されます。", "Questions are optional. Turn on the AI connection in Settings with your own API key (or Ollama) to use them. Keys are stored only on this device."],
   q_failed: ["問いかけを作れませんでした：", "Could not create questions: "],
+  cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], cmp_title: ["📚 テーマ別まとめ書き出し", "📚 Compilation export"],
+  cmp_lead: ["タグや個別の選択でノートを選び、目次つきの1つの文書にまとめて書き出します。人が読むための清書形式です（AIへの受け渡しとは別の機能です）。", "Pick notes by tag or individually and export them as one document with a table of contents, formatted for reading (separate from the AI handoff)."],
+  cmp_by_tag: ["タグで選ぶ（タップでまとめて選択）", "Pick by tag (tap to select all)"], cmp_notes: ["ノートを選ぶ", "Choose notes"],
+  cmp_all: ["すべて選択", "Select all"], cmp_none: ["すべて解除", "Clear"],
+  cmp_sort: ["並び順", "Order"], cmp_name: ["まとめのタイトル", "Compilation title"], cmp_name_ph: ["例：読書のまとめ", "e.g. Reading notes"],
+  cmp_default_title: ["ノートまとめ", "Note compilation"], cmp_toc: ["目次", "Contents"],
+  cmp_export: ["書き出す", "Export"], cmp_empty: ["ノートが選ばれていません。", "No notes are selected."],
+  cmp_done: ["{n}件をまとめて書き出しました。", "Exported {n} notes as one file."],
+  prt_btn: ["🖨 印刷", "🖨 Print"], prt_created: ["作成", "Created"], prt_updated: ["更新", "Updated"],
   wait_title: ["考え中…", "Thinking…"], wait_unit: ["秒", "s"], wait_cancel: ["やめる", "Cancel"], wait_stopped: ["やめました", "Stopped"],
   wait_tips: [
     ["[[ノート名]] と書くと、ノート同士がリンクでつながります", "ピンを付けたノートは、一覧の先頭に固定されます", "マップでは、ノートのつながりを地図のように眺められます", "集中モードでは、1つのノートだけを大きく表示して書けます", "編集したノートには「履歴」が残り、前の形に戻せます", "一覧の並び替えは、更新順・作成順・タイトル順から選べます", "本文の上に、太字や見出しを付ける入力支援ボタンがあります", "「今日の再会」には、しばらく開いていないノートが日替わりで出ます", "手書きメモや音声メモも作れます（＋新規から）"],
@@ -842,6 +864,7 @@ function docViewHtml(){
         <div class="btnrow" style="margin-bottom:0;">
           <button class="btn sub" onclick="openImport()">${t("import_btn")}</button>
           <button class="btn sub" onclick="openExportAll()">${t("export_all_btn")}</button>
+          <button class="btn sub" onclick="openCompile()">${t("cmp_btn")}</button>
         </div>
         <div class="sortrow">
           <label class="small" for="sortSel">${t("sort_label")}</label>
@@ -1016,6 +1039,7 @@ function editorHtml(n){
       <button class="btn sub" onclick="togglePin('${n.id}')">${isPinned(n.id) ? t("pinned_btn") : t("pin_btn")}</button>
       <button class="btn sub" onclick="openTranslate()">${t("translate_btn")}</button>
       <button class="btn sub" onclick="openQuestions()">${t("q_btn")}</button>
+      <button class="btn sub" onclick="printNote('${n.id}')">${t("prt_btn")}</button>
     </div>
   </div>
   <div class="card outline">
@@ -1258,6 +1282,104 @@ function downloadBlob(filename, blob){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 function safeName(title){ return String(title || "note").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) || "note"; }
+function bodyForExport(n){
+  /* 本文だけの書き出し用：手書き画像をdata URIで埋め込む */
+  return n.body.replace(/\]\((kairo-img:[^)\s]+)\)/g, (m, ref) => {
+    const url = imgCache[ref.slice(10)] || "";
+    return "](" + (url || ref) + ")";
+  });
+}
+/* ============ テーマ別まとめ書き出し（第9期） ============ */
+let cmpState = null;
+function openCompile(){
+  cmpState = { sel: new Set(), sort: "title", title: "" };
+  renderCompileModal();
+}
+function renderCompileModal(){
+  const cs = cmpState; if(!cs) return;
+  openModal(`<h2>${t("cmp_title")}</h2>
+  <p class="small">${t("cmp_lead")}</p>
+  <label class="flabel">${t("cmp_by_tag")}</label>
+  <div>${allTags().map((tg, i) => `<span class="chip" onclick="cmpPickTag(${i})">${esc(tg)}</span>`).join("")}</div>
+  <label class="flabel">${t("cmp_notes")}</label>
+  <div>${sortedNotes().map(n => `<label class="checkrow"><input type="checkbox" ${cs.sel.has(n.id) ? "checked" : ""} onchange="cmpToggle('${n.id}')"><span>${esc(n.fm.title)} <span class="small">${esc(fmtDate(n.fm.updated).slice(0, 10))}</span></span></label>`).join("")}</div>
+  <div class="btnrow"><button class="btn sub" onclick="cmpAll(true)">${t("cmp_all")}</button><button class="btn sub" onclick="cmpAll(false)">${t("cmp_none")}</button></div>
+  <label class="flabel">${t("cmp_sort")}</label>
+  <div class="seg2"><button class="${cs.sort === "title" ? "on" : ""}" onclick="cmpSetSort('title')">${t("sort_title")}</button><button class="${cs.sort === "updated" ? "on" : ""}" onclick="cmpSetSort('updated')">${t("sort_updated")}</button></div>
+  <label class="flabel">${t("cmp_name")}</label>
+  <input type="text" id="cmpTitle" value="${esc(cs.title)}" placeholder="${t("cmp_name_ph")}" oninput="cmpState.title = this.value">
+  <div id="cmpMsg"></div>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0;">
+    <button class="btn" onclick="cmpExport()">${t("cmp_export")}（<span id="cmpCount">${cs.sel.size}</span>${LANG === "en" ? "" : "件"}）</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+function cmpCountSync(){
+  const el = document.getElementById("cmpCount");
+  if(el && cmpState) el.textContent = cmpState.sel.size;
+}
+function cmpToggle(id){
+  if(!cmpState) return;
+  if(cmpState.sel.has(id)) cmpState.sel.delete(id); else cmpState.sel.add(id);
+  cmpCountSync();
+}
+function cmpAll(on){
+  if(!cmpState) return;
+  cmpState.sel = on ? new Set(notes.map(n => n.id)) : new Set();
+  renderCompileModal();
+}
+function cmpPickTag(i){
+  if(!cmpState) return;
+  const tg = allTags()[i];
+  if(!tg) return;
+  for(const n of notes) if((n.fm.tags || []).includes(tg)) cmpState.sel.add(n.id);
+  if(!cmpState.title) cmpState.title = tg + (LANG === "en" ? " compilation" : "のまとめ");
+  renderCompileModal();
+}
+function cmpSetSort(v){ if(!cmpState) return; cmpState.sort = v; renderCompileModal(); }
+function buildCompilation(){
+  const cs = cmpState;
+  const picked = notes.filter(n => cs.sel.has(n.id));
+  const sorted = picked.slice().sort(cs.sort === "title"
+    ? (a, b) => a.fm.title.localeCompare(b.fm.title, "ja")
+    : (a, b) => String(b.fm.updated).localeCompare(String(a.fm.updated)));
+  const title = (cs.title || "").trim() || t("cmp_default_title");
+  const today = fmtDate(new Date().toISOString()).slice(0, 10);
+  let out = "# " + title + "\n\n" + today + (LANG === "en" ? " · " + sorted.length + " notes" : " ・ " + sorted.length + "件のノート") + "\n\n## " + t("cmp_toc") + "\n\n"
+    + sorted.map(n => "- " + n.fm.title).join("\n") + "\n";
+  for(const n of sorted){
+    const meta = [];
+    if(n.fm.tags && n.fm.tags.length) meta.push((LANG === "en" ? "Tags: " : "タグ：") + n.fm.tags.join(", "));
+    meta.push((LANG === "en" ? "Updated: " : "更新：") + fmtDate(n.fm.updated).slice(0, 10));
+    out += "\n---\n\n## " + n.fm.title + "\n\n" + meta.join(" ／ ") + "\n\n" + bodyForExport(n).trim() + "\n";
+  }
+  return { title, text: out, count: sorted.length };
+}
+function cmpExport(){
+  if(!cmpState) return;
+  const titleEl = document.getElementById("cmpTitle");
+  if(titleEl) cmpState.title = titleEl.value;
+  if(!cmpState.sel.size){
+    const m = document.getElementById("cmpMsg");
+    if(m) m.innerHTML = `<div class="msg">${t("cmp_empty")}</div>`;
+    return;
+  }
+  const built = buildCompilation();
+  shareOrDownload(built.title.replace(/[\\/:*?"<>|]/g, "_") + ".md", built.text);
+  const m = document.getElementById("cmpMsg");
+  if(m) m.innerHTML = `<div class="msg">${esc(t("cmp_done").replace("{n}", built.count))}</div>`;
+}
+/* ============ ノートの印刷（第9期） ============ */
+function printNote(id){
+  const n = getNote(id); if(!n) return;
+  const pa = document.getElementById("printArea");
+  if(!pa) return;
+  pa.innerHTML = `<div class="prt-head"><h1>${esc(n.fm.title)}</h1><div class="prt-date">${t("prt_created")}：${esc(fmtDate(n.fm.created).slice(0, 10))} ／ ${t("prt_updated")}：${esc(fmtDate(n.fm.updated).slice(0, 10))}</div></div><div class="preview">${blocksToHtml(parseBlocks(n.body))}</div>`;
+  document.body.classList.add("printing-note");
+  const done = () => { document.body.classList.remove("printing-note"); pa.innerHTML = ""; window.removeEventListener("afterprint", done); };
+  window.addEventListener("afterprint", done);
+  setTimeout(() => window.print(), 60);
+}
 function mdForExport(n){
   /* 書き出しでは手書き画像をdata URIで埋め込み、単体ファイルでも見られる形にする */
   return noteToMd(n).replace(/\]\((kairo-img:[^)\s]+)\)/g, (m, ref) => {
@@ -1712,8 +1834,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
