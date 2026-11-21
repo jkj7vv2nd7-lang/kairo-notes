@@ -102,6 +102,16 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 .canvaswrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#f3efe3; max-height:70vh; }
 .canvas{ position:relative; width:2300px; height:1500px; background-image:radial-gradient(#cfc7ab 1.2px, transparent 1.3px); background-size:26px 26px; }
 .ccard{ position:absolute; width:238px; background:#fffdf4; border:1.5px solid var(--line); border-radius:12px; padding:11px 12px; box-shadow:0 3px 10px rgba(60,50,20,.10); cursor:grab; touch-action:none; }
+mark{ background:#ffe58a; color:inherit; padding:0 1px; border-radius:2px; }
+.noteitem .excerpt{ font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5; }
+.mapwrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#eef3ee; max-height:70vh; }
+.mapboard{ position:relative; width:1700px; height:1200px; background-image:radial-gradient(#b9c8b9 1.2px, transparent 1.3px); background-size:26px 26px; }
+.mapboard svg{ position:absolute; left:0; top:0; pointer-events:none; }
+.mnode{ position:absolute; display:flex; align-items:center; gap:7px; min-width:76px; min-height:44px; max-width:190px; padding:9px 12px; background:#fffdf4; border:1.5px solid var(--teal); border-radius:999px; box-shadow:0 3px 10px rgba(60,50,20,.12); cursor:grab; touch-action:none; font-size:13.5px; font-weight:700; }
+.mnode .dot{ flex:none; width:11px; height:11px; border-radius:50%; background:var(--accent); }
+.mnode .mt{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.mnode.iso{ border-color:var(--line); color:var(--muted); }
+.mnode.iso .dot{ background:#c9c2ab; }
 .ccard .ttl{ font-weight:800; font-size:15px; margin-bottom:4px; }
 .ccard .ex{ font-size:12.5px; color:var(--muted); max-height:74px; overflow:hidden; }
 .ccard.dragging{ box-shadow:0 12px 26px rgba(40,40,20,.30); z-index:60; }
@@ -152,7 +162,7 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 <div id="modalRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.2.1";
+const APP_VER = "1.3.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -293,6 +303,14 @@ async function idbPut(store, val){
     rq.onerror = () => rej(rq.error);
   });
 }
+async function idbGet(store, key){
+  const db = await dbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(store, "readonly").objectStore(store).get(key);
+    rq.onsuccess = () => res(rq.result || null);
+    rq.onerror = () => rej(rq.error);
+  });
+}
 async function idbDel(store, key){
   const db = await dbOpen();
   return new Promise((res, rej) => {
@@ -339,9 +357,60 @@ function getNote(id){ return notes.find(n => n.id === id) || null; }
 function sortedNotes(){
   return notes.slice().sort((a, b) => String(b.fm.updated).localeCompare(String(a.fm.updated)));
 }
+/* ============ ノートの履歴（保存前の形の控え・非破壊） ============ */
+const HIST_CAP = 20;
+let HIST_COALESCE_MS = 90000;
+async function histGet(id){
+  const v = await metaGet("hist:" + id, []);
+  return Array.isArray(v) ? v : [];
+}
+async function pushHistory(id, oldMd, force){
+  if(!oldMd) return;
+  const list = await histGet(id);
+  const last = list[list.length - 1];
+  if(last && last.md === oldMd) return;
+  if(!force && last && Date.now() - last.ts < HIST_COALESCE_MS) return;
+  list.push({ ts: Date.now(), md: oldMd });
+  while(list.length > HIST_CAP) list.shift();
+  await metaSet("hist:" + id, list);
+}
 async function persistNote(n){
+  const old = await idbGet("notes", n.id);
+  const candidate = noteToMd(n);
+  if(old && old.md !== candidate) await pushHistory(n.id, old.md);
   n.fm.updated = nowIso();
   await idbPut("notes", { id: n.id, md: noteToMd(n) });
+}
+function openHistory(id){
+  const n = getNote(id); if(!n) return;
+  histGet(id).then(list => {
+    const rows = list.slice().reverse();
+    openModal(`<h2>🕘 「${esc(n.fm.title)}」の履歴</h2>
+    <p class="small">保存されるたびに、直前の形を控えとして残しています（最大${HIST_CAP}件）。戻しても今の形は控えに残るので、やり直せます。</p>
+    ${rows.length ? rows.map(en => {
+      const p = parseNote(id, en.md);
+      const firstLine = (p.body.split("\n").map(s => s.trim()).find(s => s && !s.startsWith("#")) || "").slice(0, 60);
+      return `<div class="relrow">
+        <div class="relmain"><b>${esc(fmtDate(new Date(en.ts).toISOString()))}</b><br><span class="small">${esc(p.fm.title)}${firstLine ? " ― " + esc(firstLine) : ""}</span></div>
+        <button class="mini" onclick="restoreHistory('${id}', ${en.ts})">この形に戻す</button>
+      </div>`;
+    }).join("") : `<p class="small">まだ履歴がありません。ノートを編集して保存すると、ここに控えが残ります。</p>`}
+    <div class="sheetfoot"><div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div></div>`);
+  });
+}
+async function restoreHistory(id, ts){
+  const n = getNote(id); if(!n) return;
+  const list = await histGet(id);
+  const en = list.find(x => x.ts === ts);
+  if(!en) return;
+  if(!confirm("この形に戻しますか？（今の形も控えに残ります）")) return;
+  await pushHistory(id, noteToMd(n), true);
+  const restored = parseNote(id, en.md);
+  const idx = notes.findIndex(x => x.id === id);
+  if(idx >= 0) notes[idx] = restored;
+  await idbPut("notes", { id, md: en.md });
+  closeModal();
+  render();
 }
 async function createNote(title, body, tags, status){
   const t = nowIso();
@@ -354,6 +423,7 @@ async function deleteNote(id){
   notes = notes.filter(n => n.id !== id);
   aiTargets.delete(id); saveAiTargets();
   await idbDel("notes", id);
+  await idbDel("meta", "hist:" + id);
   await deleteNoteImages(id);
   if(currentId === id) currentId = null;
 }
@@ -372,7 +442,7 @@ async function replaceAllNotes(list){
 /* ============ サンプルノート（初回起動） ============ */
 const SAMPLES = [
   { title: "Kairoの使い方", tags: ["ガイド"], status: "doing", body:
-"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
+"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n- **マップ**：[[ノート名]] のリンクをもとに、ノート同士のつながりを地図で見る場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
   { title: "買い物リストの工夫", tags: ["暮らし", "買い物"], status: "idea", body:
 "# 買い物リストの工夫\n\n## 困りごと\n\n- 買い忘れが多い\n- 同じものを二重に買ってしまう\n\n## 工夫\n\n- 店の売り場の順番に並べ替える\n- 在庫が少なくなった時点でリストに足す\n- 買い物メモは週の初めにリセットする\n\n## 次に試すこと\n\n冷蔵庫の在庫メモと買い物リストを1つのノートにまとめてみる。" },
   { title: "読書メモ：数学の本", tags: ["読書", "数学"], status: "doing", body:
@@ -401,6 +471,7 @@ function renderBottom(){
     { k: "doc", label: "📄 文書" },
     { k: "board", label: "📋 ボード" },
     { k: "canvas", label: "🗂 キャンバス" },
+    { k: "map", label: "🗺 マップ" },
     { k: "ai", label: "🤖 AI整理" }
   ];
   $("#bottombar").innerHTML = items.map(it =>
@@ -424,6 +495,7 @@ function render(){
   if(view === "doc") app.innerHTML = docViewHtml();
   else if(view === "board") app.innerHTML = boardViewHtml();
   else if(view === "canvas"){ app.innerHTML = canvasViewHtml(); afterCanvasRender(); }
+  else if(view === "map"){ app.innerHTML = mapViewHtml(); afterMapRender(); }
   else if(view === "ai") app.innerHTML = aiViewHtml();
   else if(view === "settings") app.innerHTML = settingsViewHtml();
   window.scrollTo(0, 0);
@@ -472,12 +544,43 @@ function docViewHtml(){
     <div class="editor" id="editorPane">${cur ? editorHtml(cur) : emptyEditorHtml()}</div>
   </div>`;
 }
+function hlHtml(text){
+  const e = esc(text);
+  const q = (searchQ || "").trim();
+  if(!q) return e;
+  const needle = esc(q).toLowerCase();
+  if(!needle) return e;
+  const low = e.toLowerCase();
+  let out = "", i = 0;
+  while(true){
+    const j = low.indexOf(needle, i);
+    if(j < 0){ out += e.slice(i); break; }
+    out += e.slice(i, j) + "<mark>" + e.slice(j, j + needle.length) + "</mark>";
+    i = j + needle.length;
+  }
+  return out;
+}
+function plainTextOf(n){
+  return parseBlocks(n.body).map(b => b.type === "list" ? b.items.join(" ") : (b.text || "")).join(" ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "（手書き画像）").replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").trim();
+}
+function excerptFor(n){
+  const t = plainTextOf(n);
+  const q = (searchQ || "").trim().toLowerCase();
+  const i = q ? t.toLowerCase().indexOf(q) : -1;
+  if(i < 0) return t.slice(0, 90);
+  const start = Math.max(0, i - 30);
+  return (start > 0 ? "…" : "") + t.slice(start, start + 90);
+}
 function noteListHtml(){
   const list = filteredNotes();
   if(!list.length) return `<div class="card small">ノートがありません。「＋ 新規」から作れます。</div>`;
+  const searching = !!(searchQ || "").trim();
   return list.map(n => `<div class="noteitem ${n.id === currentId ? "on" : ""}" onclick="openNote('${n.id}')">
-    <div class="ttl">${esc(n.fm.title)}</div>
-    <div>${n.fm.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}<span class="tag" style="background:#fdf3e0; color:#9a6414;">${statusLabel(n.fm.status)}</span></div>
+    <div class="ttl">${hlHtml(n.fm.title)}</div>
+    <div>${n.fm.tags.map(t => `<span class="tag">${hlHtml(t)}</span>`).join("")}<span class="tag" style="background:#fdf3e0; color:#9a6414;">${statusLabel(n.fm.status)}</span></div>
+    ${searching ? `<div class="excerpt">${hlHtml(excerptFor(n))}</div>` : ""}
     <div class="meta">更新 ${fmtDate(n.fm.updated)}</div>
   </div>`).join("");
 }
@@ -545,6 +648,7 @@ function editorHtml(n){
     </div>
     <div class="btnrow">
       <button class="btn sub" onclick="openPad('${n.id}')">✍️ 手書きメモをこのノートに追加</button>
+      <button class="btn sub" onclick="openHistory('${n.id}')">🕘 履歴</button>
     </div>
   </div>
   <div class="card outline">
@@ -808,6 +912,7 @@ function dragMove(e){
   drag.moved = true;
   drag.el.classList.add("dragging");
   drag.el.style.transform = "translate(" + dx + "px," + dy + "px)";
+  if(drag.mode === "map") drawMapEdges();
 }
 async function dragEnd(e){
   window.removeEventListener("pointermove", dragMove);
@@ -829,6 +934,13 @@ async function dragEnd(e){
     d.el.style.left = x + "px"; d.el.style.top = y + "px";
     canvasPos[d.id] = { x: Math.round(x), y: Math.round(y) };
     await metaSet("canvasPos", canvasPos);
+  } else if(d.mode === "map"){
+    const x = Math.max(0, Math.min(1600, d.el.offsetLeft + (e.clientX - d.sx)));
+    const y = Math.max(0, Math.min(1140, d.el.offsetTop + (e.clientY - d.sy)));
+    d.el.style.left = x + "px"; d.el.style.top = y + "px";
+    mapPos[d.id] = { x: Math.round(x), y: Math.round(y) };
+    await metaSet("mapPos", mapPos);
+    drawMapEdges();
   }
 }
 async function setNoteStatus(id, status){
@@ -877,6 +989,75 @@ function canvasViewHtml(){
     </div></div>`;
 }
 function afterCanvasRender(){ /* 位置はHTMLに直接書くため追加処理なし */ }
+/* ============ つながりマップ（[[ ]]リンクの地図） ============ */
+let mapPos = {};
+function mapEdges(){
+  const byTitle = new Map();
+  notes.forEach(n => { if(n.fm.title) byTitle.set(n.fm.title, n.id); });
+  const seen = new Set();
+  const edges = [];
+  for(const n of notes){
+    const re = /\[\[([^\]]+)\]\]/g;
+    let m;
+    while((m = re.exec(n.body || "")) !== null){
+      const target = byTitle.get(m[1].trim());
+      if(!target || target === n.id) continue;
+      const key = [n.id, target].sort().join("|");
+      if(seen.has(key)) continue;
+      seen.add(key);
+      edges.push({ a: n.id, b: target });
+    }
+  }
+  return edges;
+}
+function mapPosFor(n, i, total){
+  if(mapPos[n.id]) return mapPos[n.id];
+  const cx = 850, cy = 600;
+  const r = Math.max(300, Math.min(540, 200 + total * 24));
+  const ang = (Math.PI * 2 * i) / Math.max(1, total) - Math.PI / 2;
+  return { x: Math.round(cx + r * Math.cos(ang) - 50), y: Math.round(cy + r * Math.sin(ang) - 22) };
+}
+function mapViewHtml(){
+  const list = sortedNotes();
+  const edges = mapEdges();
+  const linked = new Set();
+  edges.forEach(e => { linked.add(e.a); linked.add(e.b); });
+  return `<div class="card" style="padding:12px;">
+      <h2 style="margin:0 0 4px;">🗺 つながりマップ</h2>
+      <p class="small" style="margin:0;">本文の [[ノート名]] リンクをもとに、ノート同士のつながりを地図にしました（ノート ${list.length} 件・リンク ${edges.length} 本）。点をタップするとそのノートを開きます。ドラッグで動かせて、位置はアプリ側に保存されます（本文には書き込まれません）。線のないノートは、まだリンクがないノートです。</p>
+      <div class="btnrow" style="margin-bottom:0;"><button class="btn sub" onclick="resetMapLayout()">↺ 並べ直す（円形に整列）</button></div>
+    </div>
+    <div class="mapwrap"><div class="mapboard" id="mapBoard">
+    <svg id="mapSvg" width="1700" height="1200"></svg>
+    ${list.map((n, i) => {
+      const p = mapPosFor(n, i, list.length);
+      return `<div class="mnode ${linked.has(n.id) ? "" : "iso"}" data-id="${n.id}" style="left:${p.x}px; top:${p.y}px;" onpointerdown="dragStart(event, this, '${n.id}', 'map')"><span class="dot"></span><span class="mt">${esc(n.fm.title)}</span></div>`;
+    }).join("")}
+    </div></div>`;
+}
+function drawMapEdges(){
+  const svg = document.getElementById("mapSvg");
+  const board = document.getElementById("mapBoard");
+  if(!svg || !board) return;
+  const br = board.getBoundingClientRect();
+  const center = id => {
+    const el = board.querySelector(`.mnode[data-id="${id}"]`);
+    if(!el) return null;
+    const r = el.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - br.left, y: r.top + r.height / 2 - br.top };
+  };
+  svg.innerHTML = mapEdges().map(e => {
+    const A = center(e.a), B = center(e.b);
+    if(!A || !B) return "";
+    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#7ba58d" stroke-width="2" stroke-opacity="0.75"/>`;
+  }).join("");
+}
+function afterMapRender(){ drawMapEdges(); }
+async function resetMapLayout(){
+  mapPos = {};
+  await metaSet("mapPos", mapPos);
+  render();
+}
 /* ============ AI接続（任意・既定OFF／キーは端末内のみ） ============ */
 const KAIRO_AI_KEY = "kairo-ai-v1";
 const AI_DEFAULTS = {
@@ -1856,6 +2037,7 @@ async function boot(){
   const rows = await idbAll("notes");
   notes = rows.map(r => parseNote(r.id, r.md));
   canvasPos = await metaGet("canvasPos", {});
+  mapPos = await metaGet("mapPos", {});
   await loadSnaps();
   await loadImgCache();
   const seeded = await metaGet("seeded", false);
