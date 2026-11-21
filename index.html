@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kairo ノート ― MarkdownノートOS</title>
+<meta name="description" content="標準Markdownを基盤にした、ローカルファーストのノートアプリ。文書・ボード・キャンバスの3視点と、非破壊のAI整理。">
+<meta name="theme-color" content="#2f6f6a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta property="og:title" content="Kairo ノート ― MarkdownノートOS">
+<meta property="og:description" content="記録と整理を分断しない、ローカルファーストのMarkdownノート。AI整理は差分プレビュー→承認→実行（ロールバック可）の非破壊設計。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="og-image.png">
+<style>
+:root{
+  --teal:#2f6f6a; --teal-dark:#245a55; --accent:#e8873a; --bg:#f7f5ef; --card:#fffdf8;
+  --ink:#26312e; --muted:#6d7a75; --line:#ddd5c2; --danger:#b03a2e; --ok:#2e7d4f;
+  --del-bg:#fbe9e4; --add-bg:#e6f4ea;
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{ font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; background:var(--bg); color:var(--ink); font-size:16px; line-height:1.65; }
+header.top{ background:var(--teal); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:30; }
+header.top img{ width:38px; height:38px; border-radius:9px; }
+header.top .t{ font-size:20px; font-weight:800; letter-spacing:.02em; }
+header.top .sub{ font-size:12px; opacity:.85; }
+header.top .sp{ flex:1; }
+.iconbtn{ background:rgba(255,255,255,.16); color:#fff; border:none; border-radius:10px; font-size:18px; padding:8px 12px; cursor:pointer; }
+main{ padding:14px 14px 110px; max-width:1180px; margin:0 auto; }
+.bottombar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdf8; border-top:1px solid var(--line); display:flex; gap:6px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow:0 -3px 14px rgba(60,50,20,.08); }
+.bottombar button{ flex:1; min-height:54px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; padding:4px 2px; }
+.bottombar button.on{ background:var(--teal); border-color:var(--teal); color:#fff; }
+.bottombar button.new{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px; }
+.card h2{ font-size:18px; margin:2px 0 10px; }
+.btn{ display:inline-block; min-height:48px; padding:10px 18px; border-radius:11px; border:1.5px solid var(--teal); background:var(--teal); color:#fff; font-size:16px; font-weight:700; cursor:pointer; }
+.btn.sub{ background:#fff; color:var(--teal); }
+.btn.ghost{ background:#fff; color:var(--ink); border-color:var(--line); }
+.btn.warn{ background:#fff; color:var(--danger); border-color:var(--danger); }
+.btn:disabled{ opacity:.45; cursor:default; }
+.btnrow{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+.btnrow .btn{ flex:1; }
+input[type=text],input[type=password],textarea,select{ width:100%; font-size:16px; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
+textarea{ line-height:1.6; }
+label.flabel{ display:block; font-size:13px; font-weight:700; color:var(--muted); margin:12px 0 4px; }
+.small{ font-size:13px; color:var(--muted); }
+.msg{ background:#fdf3e0; border:1px solid #ecd9ae; border-radius:10px; padding:10px 12px; margin:10px 0; font-size:14px; }
+.hidden{ display:none !important; }
+.chip{ display:inline-block; padding:5px 12px; border-radius:999px; border:1.5px solid var(--line); background:#fff; font-size:13px; font-weight:700; cursor:pointer; margin:0 6px 6px 0; }
+.chip.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
+.tag{ display:inline-block; background:#eef4f2; color:var(--teal-dark); border-radius:6px; padding:1px 8px; font-size:12px; font-weight:700; margin-right:5px; }
+/* 文書ビュー */
+.docwrap{ display:flex; gap:14px; align-items:flex-start; }
+.notelist{ width:308px; flex:none; }
+.noteitem{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:9px; cursor:pointer; }
+.noteitem.on{ border-color:var(--teal); box-shadow:0 0 0 2px rgba(47,111,106,.25); }
+.noteitem .ttl{ font-weight:800; font-size:16px; }
+.noteitem .meta{ font-size:12px; color:var(--muted); margin-top:3px; }
+.editor{ flex:1; min-width:0; }
+.edtitle{ font-size:20px; font-weight:800; }
+textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px; }
+.seg{ display:flex; gap:6px; margin:10px 0; }
+.seg button{ flex:1; min-height:44px; border-radius:10px; border:1.5px solid var(--line); background:#fff; font-weight:700; font-size:15px; cursor:pointer; }
+.seg button.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
+.preview{ background:#fff; border:1px solid var(--line); border-radius:12px; padding:16px 18px; min-height:300px; overflow-wrap:break-word; }
+.preview h1{ font-size:24px; border-bottom:2px solid var(--line); padding-bottom:6px; }
+.preview h2{ font-size:20px; margin-top:22px; }
+.preview h3{ font-size:17px; margin-top:18px; }
+.preview code{ background:#f0ead8; padding:1px 6px; border-radius:5px; font-size:14px; }
+.preview pre{ background:#26312e; color:#f2efe4; padding:12px; border-radius:10px; overflow-x:auto; }
+.preview pre code{ background:none; color:inherit; padding:0; }
+.preview blockquote{ border-left:4px solid var(--teal); margin:10px 0; padding:4px 12px; color:var(--muted); background:#f4f7f5; }
+.preview a{ color:var(--teal-dark); }
+.outline{ font-size:14px; }
+.outline button{ display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px dashed var(--line); padding:7px 4px; font-size:14px; cursor:pointer; color:var(--ink); }
+.outline .lv2{ padding-left:18px; } .outline .lv3{ padding-left:32px; } .outline .lv4{ padding-left:44px; }
+.relitem{ border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:8px; background:#fff; }
+.relitem .ttl{ font-weight:700; font-size:15px; }
+.backbtn{ display:none; }
+/* ボード */
+.board{ display:flex; gap:12px; overflow-x:auto; padding-bottom:10px; align-items:flex-start; }
+.col{ flex:none; width:262px; background:#efe9da; border:1px solid var(--line); border-radius:14px; padding:10px; min-height:220px; }
+.col h3{ margin:2px 2px 10px; font-size:16px; }
+.col .cnt{ color:var(--muted); font-size:13px; }
+.bcard{ background:#fff; border:1px solid var(--line); border-radius:11px; padding:10px 11px; margin-bottom:9px; cursor:grab; touch-action:none; }
+.bcard .ttl{ font-weight:800; font-size:15px; }
+.bcard select{ margin-top:8px; padding:6px 8px; font-size:14px; min-height:38px; }
+.bcard.dragging{ opacity:.85; box-shadow:0 10px 24px rgba(40,40,20,.28); z-index:60; position:relative; }
+/* キャンバス */
+.canvaswrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#f3efe3; max-height:70vh; }
+.canvas{ position:relative; width:2300px; height:1500px; background-image:radial-gradient(#cfc7ab 1.2px, transparent 1.3px); background-size:26px 26px; }
+.ccard{ position:absolute; width:238px; background:#fffdf4; border:1.5px solid var(--line); border-radius:12px; padding:11px 12px; box-shadow:0 3px 10px rgba(60,50,20,.10); cursor:grab; touch-action:none; }
+.ccard .ttl{ font-weight:800; font-size:15px; margin-bottom:4px; }
+.ccard .ex{ font-size:12.5px; color:var(--muted); max-height:74px; overflow:hidden; }
+.ccard.dragging{ box-shadow:0 12px 26px rgba(40,40,20,.30); z-index:60; }
+/* AI */
+.diffbox{ border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px 12px; font-size:13.5px; max-height:320px; overflow:auto; white-space:pre-wrap; overflow-wrap:break-word; }
+.dl-del{ background:var(--del-bg); }
+.dl-add{ background:var(--add-bg); }
+.actitem{ border:1px solid var(--line); border-radius:12px; padding:12px; margin-bottom:12px; background:#fff; }
+.actitem h4{ margin:0 0 6px; font-size:16px; }
+.checkrow{ display:flex; gap:10px; align-items:flex-start; }
+.checkrow input[type=checkbox]{ width:24px; height:24px; flex:none; margin-top:2px; }
+.targetitem{ display:flex; gap:10px; align-items:center; border-bottom:1px dashed var(--line); padding:8px 2px; }
+.targetitem input[type=checkbox]{ width:24px; height:24px; flex:none; }
+/* モーダル */
+.overlay{ position:fixed; inset:0; background:rgba(30,35,30,.45); z-index:80; display:flex; align-items:flex-end; justify-content:center; }
+.sheet{ background:var(--card); width:100%; max-width:640px; max-height:88vh; overflow:auto; border-radius:18px 18px 0 0; padding:18px; }
+.sheet h2{ margin-top:0; }
+footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px 4px; }
+@media (max-width:760px){
+  .docwrap{ display:block; }
+  .notelist{ width:100%; }
+  .editor{ display:none; }
+  .docwrap.editing .notelist{ display:none; }
+  .docwrap.editing .editor{ display:block; }
+  .backbtn{ display:inline-block; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <img src="icon-192.png" alt="">
+  <div>
+    <div class="t">Kairo ノート</div>
+    <div class="sub">MarkdownノートOS ― 記録と整理を分断しない</div>
+  </div>
+  <div class="sp"></div>
+  <button class="iconbtn" onclick="go('settings')" aria-label="設定">⚙ 設定</button>
+</header>
+<main id="app"></main>
+<footer>
+  <div>Kairo ノート ver <span id="verFoot">1.0.0</span> ／ ノートはこの端末の中（IndexedDB）にだけ保存されます</div>
+  <div style="margin-top:8px;"><button class="btn ghost" style="min-height:40px; padding:6px 14px; font-size:14px;" onclick="updateApp()">最新の版に更新する</button></div>
+</footer>
+<nav class="bottombar" id="bottombar"></nav>
+<div id="modalRoot"></div>
+<script>
+"use strict";
+const APP_VER = "1.0.0";
+/* ============ ユーティリティ ============ */
+const $ = s => document.querySelector(s);
+function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function uid(){ return "n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function nowIso(){ const d = new Date(); const p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + "T" + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds()); }
+function fmtDate(iso){ if(!iso) return ""; return String(iso).slice(0, 10) + " " + String(iso).slice(11, 16); }
+const STATUSES = { idea: "アイデア", doing: "進行中", done: "完了", keep: "保管" };
+function statusLabel(s){ return STATUSES[s] || STATUSES.idea; }
+/* ============ フロントマター（素のMarkdownを維持） ============ */
+function parseNote(id, text){
+  const fm = { title: "", tags: [], status: "idea", created: "", updated: "" };
+  let body = String(text || "");
+  const m = body.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if(m){
+    body = body.slice(m[0].length);
+    m[1].split(/\r?\n/).forEach(line => {
+      const kv = line.match(/^([A-Za-z_]+):\s*(.*)$/);
+      if(!kv) return;
+      const k = kv[1], v = kv[2].trim();
+      if(k === "title") fm.title = v.replace(/^"|"$/g, "");
+      else if(k === "tags") fm.tags = v.replace(/^\[/, "").replace(/\]$/, "").split(",").map(s => s.trim().replace(/^"|"$/g, "")).filter(Boolean);
+      else if(k === "status") fm.status = STATUSES[v] ? v : "idea";
+      else if(k === "created") fm.created = v;
+      else if(k === "updated") fm.updated = v;
+    });
+  }
+  if(!fm.title){
+    const h = body.match(/^#\s+(.+)$/m);
+    fm.title = h ? h[1].trim() : "無題のノート";
+  }
+  return { id, fm, body };
+}
+function noteToMd(n){
+  const f = n.fm;
+  return "---\ntitle: " + f.title + "\ntags: [" + f.tags.join(", ") + "]\nstatus: " + f.status + "\ncreated: " + f.created + "\nupdated: " + f.updated + "\n---\n" + n.body;
+}
+/* ============ Markdown：ブロック解析（3視点の共通モデル） ============ */
+function parseBlocks(body){
+  const lines = String(body || "").split("\n");
+  const blocks = [];
+  let i = 0;
+  while(i < lines.length){
+    const ln = lines[i];
+    const h = ln.match(/^(#{1,6})\s+(.*)$/);
+    if(h){ blocks.push({ type: "heading", level: h[1].length, text: h[2].trim() }); i++; continue; }
+    if(/^```/.test(ln)){ const buf = []; i++; while(i < lines.length && !/^```/.test(lines[i])){ buf.push(lines[i]); i++; } i++; blocks.push({ type: "code", text: buf.join("\n") }); continue; }
+    if(/^\s*$/.test(ln)){ i++; continue; }
+    if(/^(-{3,}|\*{3,}|_{3,})\s*$/.test(ln)){ blocks.push({ type: "hr" }); i++; continue; }
+    if(/^>\s?/.test(ln)){ const buf = []; while(i < lines.length && /^>\s?/.test(lines[i])){ buf.push(lines[i].replace(/^>\s?/, "")); i++; } blocks.push({ type: "quote", text: buf.join("\n") }); continue; }
+    if(/^\s*([-*+]|\d+\.)\s+/.test(ln)){ const items = []; while(i < lines.length && /^\s*([-*+]|\d+\.)\s+/.test(lines[i])){ items.push(lines[i].replace(/^\s*([-*+]|\d+\.)\s+/, "")); i++; } blocks.push({ type: "list", items }); continue; }
+    const buf = [ln]; i++;
+    while(i < lines.length && !/^\s*$/.test(lines[i]) && !/^(#{1,6})\s/.test(lines[i]) && !/^```/.test(lines[i]) && !/^>\s?/.test(lines[i])){ buf.push(lines[i]); i++; }
+    blocks.push({ type: "para", text: buf.join("\n") });
+  }
+  return blocks;
+}
+function inlineMd(s){
+  let t = esc(s);
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function blocksToHtml(blocks){
+  return blocks.map(b => {
+    if(b.type === "heading") return "<h" + b.level + ">" + inlineMd(b.text) + "</h" + b.level + ">";
+    if(b.type === "code") return "<pre><code>" + esc(b.text) + "</code></pre>";
+    if(b.type === "hr") return "<hr>";
+    if(b.type === "quote") return "<blockquote>" + inlineMd(b.text).replace(/\n/g, "<br>") + "</blockquote>";
+    if(b.type === "list") return "<ul>" + b.items.map(it => {
+      const cb = it.match(/^\[([ xX])\]\s+(.*)$/);
+      if(cb) return "<li>" + (cb[1].toLowerCase() === "x" ? "☑ " : "☐ ") + inlineMd(cb[2]) + "</li>";
+      return "<li>" + inlineMd(it) + "</li>";
+    }).join("") + "</ul>";
+    return "<p>" + inlineMd(b.text).replace(/\n/g, "<br>") + "</p>";
+  }).join("");
+}
+function outlineOf(blocks){ return blocks.filter(b => b.type === "heading"); }
+function excerptOf(blocks, max){
+  const parts = [];
+  for(const b of blocks){
+    if(b.type === "para" || b.type === "quote") parts.push(b.text);
+    else if(b.type === "list") parts.push(b.items.join("、"));
+    if(parts.join(" ").length >= (max || 90)) break;
+  }
+  return parts.join(" ").replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").slice(0, max || 90);
+}
+/* ============ IndexedDB（ノート実体とアプリ側メタデータ） ============ */
+const DB_NAME = "kairo-notes-v1";
+let dbPromise = null;
+function dbOpen(){
+  if(dbPromise) return dbPromise;
+  dbPromise = new Promise((res, rej) => {
+    const rq = indexedDB.open(DB_NAME, 1);
+    rq.onupgradeneeded = () => {
+      const db = rq.result;
+      if(!db.objectStoreNames.contains("notes")) db.createObjectStore("notes", { keyPath: "id" });
+      if(!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+    };
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+  return dbPromise;
+}
+async function idbAll(store){
+  const db = await dbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(store, "readonly").objectStore(store).getAll();
+    rq.onsuccess = () => res(rq.result || []);
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbPut(store, val){
+  const db = await dbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(store, "readwrite").objectStore(store).put(val);
+    rq.onsuccess = () => res();
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function idbDel(store, key){
+  const db = await dbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(store, "readwrite").objectStore(store).delete(key);
+    rq.onsuccess = () => res();
+    rq.onerror = () => rej(rq.error);
+  });
+}
+async function metaGet(key, def){
+  const rows = await idbAll("meta");
+  const r = rows.find(x => x.key === key);
+  return r ? r.value : def;
+}
+async function metaSet(key, value){ await idbPut("meta", { key, value }); }
+/* ============ 状態とノート操作 ============ */
+let notes = [];           /* {id, fm, body} の配列（正本はnoteToMdで作るMarkdown） */
+let view = "doc";         /* doc | board | canvas | ai | settings */
+let currentId = null;
+let searchQ = "", tagFilter = "";
+let boardTagFilter = "";
+let aiTargets = new Set();
+try{ (JSON.parse(localStorage.getItem("kairo-ai-targets") || "[]")).forEach(id => aiTargets.add(id)); }catch(e){}
+function saveAiTargets(){ try{ localStorage.setItem("kairo-ai-targets", JSON.stringify(Array.from(aiTargets))); }catch(e){} }
+function getNote(id){ return notes.find(n => n.id === id) || null; }
+function sortedNotes(){
+  return notes.slice().sort((a, b) => String(b.fm.updated).localeCompare(String(a.fm.updated)));
+}
+async function persistNote(n){
+  n.fm.updated = nowIso();
+  await idbPut("notes", { id: n.id, md: noteToMd(n) });
+}
+async function createNote(title, body, tags, status){
+  const t = nowIso();
+  const n = { id: uid(), fm: { title: title || "無題のノート", tags: tags || [], status: status || "idea", created: t, updated: t }, body: body || "" };
+  notes.push(n);
+  await idbPut("notes", { id: n.id, md: noteToMd(n) });
+  return n;
+}
+async function deleteNote(id){
+  notes = notes.filter(n => n.id !== id);
+  aiTargets.delete(id); saveAiTargets();
+  await idbDel("notes", id);
+  if(currentId === id) currentId = null;
+}
+async function replaceAllNotes(list){
+  const db = await dbOpen();
+  await new Promise((res, rej) => {
+    const tx = db.transaction("notes", "readwrite");
+    tx.objectStore("notes").clear();
+    tx.oncomplete = () => res();
+    tx.onerror = () => rej(tx.error);
+  });
+  notes = list;
+  for(const n of notes) await idbPut("notes", { id: n.id, md: noteToMd(n) });
+  if(currentId && !getNote(currentId)) currentId = null;
+}
+/* ============ サンプルノート（初回起動） ============ */
+const SAMPLES = [
+  { title: "Kairoの使い方", tags: ["ガイド"], status: "doing", body:
+"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
+  { title: "買い物リストの工夫", tags: ["暮らし", "買い物"], status: "idea", body:
+"# 買い物リストの工夫\n\n## 困りごと\n\n- 買い忘れが多い\n- 同じものを二重に買ってしまう\n\n## 工夫\n\n- 店の売り場の順番に並べ替える\n- 在庫が少なくなった時点でリストに足す\n- 買い物メモは週の初めにリセットする\n\n## 次に試すこと\n\n冷蔵庫の在庫メモと買い物リストを1つのノートにまとめてみる。" },
+  { title: "読書メモ：数学の本", tags: ["読書", "数学"], status: "doing", body:
+"# 読書メモ：数学の本\n\n## 心に残った考え方\n\n- 数えることは、整理することでもある\n- 図に描くと、言葉より先に分かることがある\n\n## あとで調べる\n\n- 組合せの数え方（順列と組合せの違い）\n- 地図の塗り分けと四色問題\n\n> 分からないところに印を付けておくと、あとで読み返したときに宝物になる。" },
+  { title: "旅行の計画メモ", tags: ["旅行", "買い物"], status: "idea", body:
+"# 旅行の計画メモ\n\n## 行きたい場所\n\n- 海の見える駅\n- 古い商店街\n\n## 持ち物と買い物\n\n- 旅行前に買うもの：小さなポーチ、折りたたみ傘\n- 現地で買いたいもの：地元のお菓子\n\n## メモ\n\n切符は早めに取る。帰りの時間を先に決めると、計画が立てやすい。" }
+];
+async function seedSamples(){
+  for(const s of SAMPLES){
+    const t = nowIso();
+    const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
+    notes.push(n);
+    await idbPut("notes", { id: n.id, md: noteToMd(n) });
+  }
+  await metaSet("seeded", true);
+}
+/* ============ 画面遷移と下部バー ============ */
+function go(v){
+  view = v;
+  stopSpeakSafe();
+  render();
+}
+function renderBottom(){
+  const items = [
+    { k: "new", label: "＋ 新規", cls: "new" },
+    { k: "doc", label: "📄 文書" },
+    { k: "board", label: "📋 ボード" },
+    { k: "canvas", label: "🗂 キャンバス" },
+    { k: "ai", label: "🤖 AI整理" }
+  ];
+  $("#bottombar").innerHTML = items.map(it =>
+    `<button class="${it.cls || ""} ${view === it.k ? "on" : ""}" onclick="bottomTap('${it.k}')">${it.label}</button>`).join("");
+}
+function bottomTap(k){
+  if(k === "new"){ newNote(); return; }
+  go(k);
+}
+async function newNote(){
+  const n = await createNote("無題のノート", "# 無題のノート\n\n", [], "idea");
+  currentId = n.id;
+  view = "doc";
+  render();
+  const t = document.getElementById("edTitle");
+  if(t){ t.focus(); t.select(); }
+}
+function render(){
+  renderBottom();
+  const app = $("#app");
+  if(view === "doc") app.innerHTML = docViewHtml();
+  else if(view === "board") app.innerHTML = boardViewHtml();
+  else if(view === "canvas"){ app.innerHTML = canvasViewHtml(); afterCanvasRender(); }
+  else if(view === "ai") app.innerHTML = aiViewHtml();
+  else if(view === "settings") app.innerHTML = settingsViewHtml();
+  window.scrollTo(0, 0);
+}
+function stopSpeakSafe(){ /* Kairoに読み上げはないが、将来拡張のための共通フック */ }
+async function updateApp(){
+  if(!confirm("アプリのキャッシュを消して、最新の版に更新しますか？（ノートは消えません）")) return;
+  try{
+    if("caches" in window){ const ks = await caches.keys(); for(const k of ks) await caches.delete(k); }
+  }catch(e){}
+  location.reload();
+}
+/* ============ 文書ビュー ============ */
+let edMode = "edit";
+let saveTimer = null;
+function allTags(){
+  const s = new Set();
+  notes.forEach(n => n.fm.tags.forEach(t => s.add(t)));
+  return Array.from(s).sort();
+}
+function filteredNotes(){
+  let list = sortedNotes();
+  if(tagFilter) list = list.filter(n => n.fm.tags.includes(tagFilter));
+  if(searchQ){
+    const q = searchQ.toLowerCase();
+    list = list.filter(n => (n.fm.title + "\n" + n.body + "\n" + n.fm.tags.join(" ")).toLowerCase().includes(q));
+  }
+  return list;
+}
+function docViewHtml(){
+  const cur = currentId ? getNote(currentId) : null;
+  return `<div class="docwrap ${cur ? "editing" : ""}">
+    <div class="notelist">
+      <div class="card" style="padding:12px;">
+        <input type="text" id="searchBox" placeholder="🔍 ノートを検索" value="${esc(searchQ)}" oninput="searchQ = this.value; renderNoteList();">
+        <div style="margin-top:9px;">
+          <span class="chip ${tagFilter === "" ? "on" : ""}" onclick="tagFilter = ''; render();">すべて</span>${allTags().map(t => `<span class="chip ${tagFilter === t ? "on" : ""}" onclick="tagFilter = '${esc(t)}'; render();">${esc(t)}</span>`).join("")}
+        </div>
+        <div class="btnrow" style="margin-bottom:0;">
+          <button class="btn sub" onclick="openImport()">⬆ 取り込む</button>
+          <button class="btn sub" onclick="openExportAll()">⬇ 全て書き出し</button>
+        </div>
+      </div>
+      <div id="noteList">${noteListHtml()}</div>
+    </div>
+    <div class="editor" id="editorPane">${cur ? editorHtml(cur) : emptyEditorHtml()}</div>
+  </div>`;
+}
+function noteListHtml(){
+  const list = filteredNotes();
+  if(!list.length) return `<div class="card small">ノートがありません。「＋ 新規」から作れます。</div>`;
+  return list.map(n => `<div class="noteitem ${n.id === currentId ? "on" : ""}" onclick="openNote('${n.id}')">
+    <div class="ttl">${esc(n.fm.title)}</div>
+    <div>${n.fm.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}<span class="tag" style="background:#fdf3e0; color:#9a6414;">${statusLabel(n.fm.status)}</span></div>
+    <div class="meta">更新 ${fmtDate(n.fm.updated)}</div>
+  </div>`).join("");
+}
+function renderNoteList(){
+  const el = document.getElementById("noteList");
+  if(el) el.innerHTML = noteListHtml();
+}
+function emptyEditorHtml(){
+  return `<div class="card" style="text-align:center; padding:34px 18px;">
+    <div style="font-size:40px;">📄</div>
+    <h2>書くノートを選んでください</h2>
+    <p class="small">左のリストからノートを選ぶと、ここで編集できます。<br>初めての方は、サンプル「Kairoの使い方」がおすすめです。</p>
+    <button class="btn" onclick="newNote()">＋ 新しいノートを作る</button>
+  </div>`;
+}
+function editorHtml(n){
+  const blocks = parseBlocks(n.body);
+  const ol = outlineOf(blocks);
+  return `
+  <button class="btn ghost backbtn" style="min-height:42px; margin-bottom:10px;" onclick="backToList()">← 一覧へ戻る</button>
+  <div class="card">
+    <label class="flabel">タイトル</label>
+    <input type="text" class="edtitle" id="edTitle" value="${esc(n.fm.title)}" oninput="editField('title', this.value)">
+    <label class="flabel">タグ（カンマ区切り）</label>
+    <input type="text" id="edTags" value="${esc(n.fm.tags.join(", "))}" oninput="editField('tags', this.value)">
+    <label class="flabel">状態</label>
+    <select id="edStatus" onchange="editField('status', this.value)">
+      ${Object.keys(STATUSES).map(k => `<option value="${k}" ${n.fm.status === k ? "selected" : ""}>${STATUSES[k]}</option>`).join("")}
+    </select>
+    <div class="seg">
+      <button class="${edMode === "edit" ? "on" : ""}" onclick="setEdMode('edit')">✏️ 編集</button>
+      <button class="${edMode === "preview" ? "on" : ""}" onclick="setEdMode('preview')">👀 プレビュー</button>
+    </div>
+    ${edMode === "edit"
+      ? `<textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="Markdownで書けます">${esc(n.body)}</textarea>`
+      : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
+    <div class="small" style="margin-top:8px;">自動保存されます ／ 更新 ${fmtDate(n.fm.updated)}</div>
+    <div class="btnrow">
+      <button class="btn sub" onclick="exportNote('${n.id}')">⬇ .mdで書き出す</button>
+      <button class="btn sub" onclick="duplicateNote('${n.id}')">📄 複製する</button>
+      <button class="btn warn" onclick="removeNote('${n.id}')">🗑 削除</button>
+    </div>
+  </div>
+  <div class="card outline">
+    <h2>🧭 見出しアウトライン</h2>
+    ${ol.length ? ol.map((h, i) => `<button class="lv${Math.min(h.level, 4)}" onclick="jumpHeading(${i})">${esc(h.text)}</button>`).join("") : `<p class="small">見出し（# ）を書くと、ここに並びます。</p>`}
+  </div>
+  <div class="card" id="relCard">${relatedHtml(n)}</div>`;
+}
+function renderEditor(){
+  const pane = document.getElementById("editorPane");
+  const n = currentId ? getNote(currentId) : null;
+  if(pane) pane.innerHTML = n ? editorHtml(n) : emptyEditorHtml();
+}
+function openNote(id){
+  currentId = id;
+  edMode = "edit";
+  render();
+}
+function backToList(){
+  currentId = null;
+  render();
+}
+function setEdMode(m){
+  edMode = m;
+  renderEditor();
+}
+function editField(field, value){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  if(field === "title") n.fm.title = value;
+  else if(field === "tags") n.fm.tags = value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+  else if(field === "status") n.fm.status = STATUSES[value] ? value : "idea";
+  else if(field === "body") n.body = value;
+  scheduleSave();
+}
+function scheduleSave(){
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const n = currentId ? getNote(currentId) : null;
+    if(!n) return;
+    await persistNote(n);
+    renderNoteList();
+    const rel = document.getElementById("relCard");
+    if(rel) rel.innerHTML = relatedHtml(n);
+  }, 400);
+}
+function jumpHeading(idx){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  const blocks = parseBlocks(n.body);
+  const heads = blocks.map((b, i) => ({ b, i })).filter(x => x.b.type === "heading");
+  if(!heads[idx]) return;
+  if(edMode === "preview"){
+    const box = document.getElementById("previewBox");
+    if(!box) return;
+    const els = box.querySelectorAll("h1,h2,h3,h4,h5,h6");
+    if(els[idx]) els[idx].scrollIntoView({ behavior: "smooth", block: "start" });
+  } else {
+    const ta = document.getElementById("edBody");
+    if(!ta) return;
+    const lines = n.body.split("\n");
+    let seen = -1, pos = 0;
+    for(let i = 0; i < lines.length; i++){
+      if(/^#{1,6}\s/.test(lines[i])){ seen++; if(seen === idx){ ta.focus(); ta.setSelectionRange(pos, pos); ta.scrollTop = Math.max(0, (i - 2)) * 22; break; } }
+      pos += lines[i].length + 1;
+    }
+  }
+}
+async function duplicateNote(id){
+  const n = getNote(id); if(!n) return;
+  const t = nowIso();
+  const c = { id: uid(), fm: { title: n.fm.title + "（コピー）", tags: n.fm.tags.slice(), status: n.fm.status, created: t, updated: t }, body: n.body };
+  notes.push(c);
+  await idbPut("notes", { id: c.id, md: noteToMd(c) });
+  currentId = c.id;
+  render();
+}
+async function removeNote(id){
+  const n = getNote(id); if(!n) return;
+  if(!confirm("「" + n.fm.title + "」を削除しますか？この操作は取り消せません。")) return;
+  await deleteNote(id);
+  render();
+}
+/* ============ リサーフェシング（キーなし） ============ */
+function bigrams(text){
+  const t = String(text || "").replace(/\s+/g, "");
+  const s = new Set();
+  for(let i = 0; i + 1 < t.length + 0 && i + 2 <= t.length; i++) s.add(t.slice(i, i + 2));
+  return s;
+}
+function relatedNotes(n, limit){
+  const myGrams = bigrams(n.fm.title + n.body.slice(0, 900));
+  const scored = [];
+  for(const o of notes){
+    if(o.id === n.id) continue;
+    const sharedTags = o.fm.tags.filter(t => n.fm.tags.includes(t));
+    const og = bigrams(o.fm.title + o.body.slice(0, 900));
+    let inter = 0;
+    og.forEach(g => { if(myGrams.has(g)) inter++; });
+    const sim = inter / Math.max(20, Math.min(myGrams.size, og.size));
+    const score = sharedTags.length * 5 + sim * 10;
+    if(score >= 2.2) scored.push({ note: o, score, sharedTags });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit || 5);
+}
+function relatedHtml(n){
+  const rel = relatedNotes(n, 5);
+  let h = `<h2>🔁 関連する過去メモ</h2>`;
+  if(!rel.length) return h + `<p class="small">タグや語句が重なるメモが見つかると、ここに静かに表示されます。</p>`;
+  h += rel.map(r => `<div class="relitem">
+    <div class="ttl">${esc(r.note.fm.title)}</div>
+    <div class="small">${r.sharedTags.length ? "共通タグ：" + r.sharedTags.map(esc).join("、") + " ／ " : ""}語句の重なりで候補に挙がりました</div>
+    <div class="btnrow" style="margin:6px 0 0;">
+      <button class="btn sub" style="min-height:40px; font-size:14px;" onclick="openNote('${r.note.id}')">開く</button>
+      <button class="btn ${aiTargets.has(r.note.id) ? "ghost" : "sub"}" style="min-height:40px; font-size:14px;" onclick="toggleAiTarget('${r.note.id}')">${aiTargets.has(r.note.id) ? "✓ AI統合の対象に追加済み" : "＋ AI統合の対象に追加"}</button>
+    </div>
+  </div>`).join("");
+  return h;
+}
+function toggleAiTarget(id){
+  if(aiTargets.has(id)) aiTargets.delete(id); else aiTargets.add(id);
+  saveAiTargets();
+  const n = currentId ? getNote(currentId) : null;
+  const rel = document.getElementById("relCard");
+  if(rel && n) rel.innerHTML = relatedHtml(n);
+  if(view === "ai") render();
+}
+/* ============ 取り込み・書き出し ============ */
+const BULK_SEP = "<!-- ===== Kairo note ===== -->";
+function shareOrDownload(filename, text){
+  const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+  const file = new File([blob], filename, { type: "text/markdown" });
+  if(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
+    navigator.share({ files: [file] }).catch(() => downloadBlob(filename, blob));
+  } else downloadBlob(filename, blob);
+}
+function downloadBlob(filename, blob){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function safeName(title){ return String(title || "note").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) || "note"; }
+function exportNote(id){
+  const n = getNote(id); if(!n) return;
+  shareOrDownload(safeName(n.fm.title) + ".md", noteToMd(n));
+}
+function buildExportAll(){
+  return sortedNotes().map(n => noteToMd(n)).join("\n\n" + BULK_SEP + "\n\n") + "\n";
+}
+function openExportAll(){
+  if(!notes.length){ alert("ノートがありません。"); return; }
+  shareOrDownload("kairo-notes-all.md", buildExportAll());
+}
+function openModal(html){
+  $("#modalRoot").innerHTML = `<div class="overlay" onclick="if(event.target === this) closeModal()"><div class="sheet">${html}</div></div>`;
+}
+function closeModal(){ $("#modalRoot").innerHTML = ""; }
+function openImport(){
+  openModal(`<h2>⬆ ノートを取り込む</h2>
+  <p class="small">.mdファイルを選ぶか、Markdownを貼り付けて取り込めます。フロントマター（title／tags／status）があれば、そのまま引き継ぎます。「全て書き出し」で作ったまとめファイルは、自動で分割して取り込みます。</p>
+  <label class="flabel">ファイルから取り込む（複数選択可）</label>
+  <input type="file" id="impFiles" accept=".md,.markdown,.txt" multiple onchange="importFiles(this)">
+  <label class="flabel">貼り付けて取り込む</label>
+  <textarea id="impText" rows="7" placeholder="# 見出し&#10;&#10;本文…"></textarea>
+  <label class="flabel">貼り付け分のタイトル（見出しがない場合）</label>
+  <input type="text" id="impTitle" placeholder="貼り付けノート">
+  <div class="btnrow">
+    <button class="btn" onclick="importPaste()">貼り付けを取り込む</button>
+    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+  </div>
+  <div id="impMsg"></div>`);
+}
+async function importText(text, fallbackTitle){
+  const parts = String(text).split(BULK_SEP).map(s => s.trim()).filter(Boolean);
+  let count = 0;
+  for(const part of parts){
+    const n = parseNote(uid(), part);
+    if(!n.fm.created) n.fm.created = nowIso();
+    if(!n.fm.updated) n.fm.updated = nowIso();
+    if((!n.fm.title || n.fm.title === "無題のノート") && fallbackTitle && parts.length === 1) n.fm.title = fallbackTitle;
+    notes.push(n);
+    await idbPut("notes", { id: n.id, md: noteToMd(n) });
+    count++;
+  }
+  return count;
+}
+async function importFiles(input){
+  const files = Array.from(input.files || []);
+  let total = 0;
+  for(const f of files){
+    const text = await f.text();
+    total += await importText(text, f.name.replace(/\.(md|markdown|txt)$/i, ""));
+  }
+  const el = document.getElementById("impMsg");
+  if(el) el.innerHTML = `<div class="msg">${total}件のノートを取り込みました。</div>`;
+  render();
+}
+async function importPaste(){
+  const ta = document.getElementById("impText");
+  const title = (document.getElementById("impTitle") || {}).value || "";
+  if(!ta || !ta.value.trim()){ alert("取り込む文章が空です。"); return; }
+  const count = await importText(ta.value, title || "貼り付けノート");
+  closeModal();
+  alert(count + "件のノートを取り込みました。");
+  render();
+}
+/* ============ ボード／キャンバス共通のドラッグ（受け手はwindow側） ============ */
+let drag = null;
+function dragStart(e, el, id, mode){
+  if(e.target.closest("select,button,input,textarea,a")) return;
+  drag = { el, id, mode, sx: e.clientX, sy: e.clientY, moved: false };
+  window.addEventListener("pointermove", dragMove);
+  window.addEventListener("pointerup", dragEnd, { once: true });
+}
+function dragMove(e){
+  if(!drag) return;
+  const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+  if(!drag.moved && Math.hypot(dx, dy) < 7) return;
+  drag.moved = true;
+  drag.el.classList.add("dragging");
+  drag.el.style.transform = "translate(" + dx + "px," + dy + "px)";
+}
+async function dragEnd(e){
+  window.removeEventListener("pointermove", dragMove);
+  if(!drag) return;
+  const d = drag; drag = null;
+  d.el.classList.remove("dragging");
+  d.el.style.transform = "";
+  if(!d.moved){ currentId = d.id; view = "doc"; edMode = "edit"; render(); return; }
+  if(d.mode === "board"){
+    const cols = document.querySelectorAll(".col");
+    for(const c of cols){
+      const r = c.getBoundingClientRect();
+      if(e.clientX >= r.left - 6 && e.clientX <= r.right + 6){ await setNoteStatus(d.id, c.dataset.status); break; }
+    }
+    render();
+  } else if(d.mode === "canvas"){
+    const x = Math.max(0, Math.min(2000, d.el.offsetLeft + (e.clientX - d.sx)));
+    const y = Math.max(0, Math.min(1320, d.el.offsetTop + (e.clientY - d.sy)));
+    d.el.style.left = x + "px"; d.el.style.top = y + "px";
+    canvasPos[d.id] = { x: Math.round(x), y: Math.round(y) };
+    await metaSet("canvasPos", canvasPos);
+  }
+}
+async function setNoteStatus(id, status){
+  const n = getNote(id); if(!n || !STATUSES[status]) return;
+  n.fm.status = status;
+  await persistNote(n);
+}
+/* ============ ボードビュー ============ */
+function boardViewHtml(){
+  const list = boardTagFilter ? sortedNotes().filter(n => n.fm.tags.includes(boardTagFilter)) : sortedNotes();
+  return `<div class="card" style="padding:12px;">
+      <div><span class="chip ${boardTagFilter === "" ? "on" : ""}" onclick="boardTagFilter = ''; render();">すべて</span>${allTags().map(t => `<span class="chip ${boardTagFilter === t ? "on" : ""}" onclick="boardTagFilter = '${esc(t)}'; render();">${esc(t)}</span>`).join("")}</div>
+      <p class="small" style="margin:6px 0 0;">カードはドラッグで別の列へ動かせます。タップすると文書で開きます。下の欄でも状態を変えられます。</p>
+    </div>
+    <div class="board">${Object.keys(STATUSES).map(st => {
+      const cards = list.filter(n => n.fm.status === st);
+      return `<div class="col" data-status="${st}"><h3>${STATUSES[st]} <span class="cnt">${cards.length}件</span></h3>
+      ${cards.map(n => `<div class="bcard" data-id="${n.id}" onpointerdown="dragStart(event, this, '${n.id}', 'board')">
+        <div class="ttl">${esc(n.fm.title)}</div>
+        <div>${n.fm.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}</div>
+        <div class="small">${esc(excerptOf(parseBlocks(n.body), 60))}</div>
+        <select onclick="event.stopPropagation()" onchange="setNoteStatus('${n.id}', this.value).then(() => render())">
+          ${Object.keys(STATUSES).map(k => `<option value="${k}" ${n.fm.status === k ? "selected" : ""}>${STATUSES[k]}</option>`).join("")}
+        </select>
+      </div>`).join("") || `<p class="small">（なし）</p>`}
+      </div>`;
+    }).join("")}</div>`;
+}
+/* ============ キャンバスビュー ============ */
+let canvasPos = {};
+function canvasViewHtml(){
+  const list = sortedNotes();
+  return `<div class="card" style="padding:12px;">
+      <h2 style="margin:0 0 4px;">🗂 キャンバス</h2>
+      <p class="small" style="margin:0;">カードをドラッグで自由に置けます。位置はアプリ側に保存され、ノート本文には書き込まれません。タップすると文書で開きます。</p>
+    </div>
+    <div class="canvaswrap"><div class="canvas" id="canvasBoard">
+    ${list.map((n, i) => {
+      const p = canvasPos[n.id] || { x: 30 + (i % 4) * 272, y: 30 + Math.floor(i / 4) * 196 };
+      return `<div class="ccard" data-id="${n.id}" style="left:${p.x}px; top:${p.y}px;" onpointerdown="dragStart(event, this, '${n.id}', 'canvas')">
+        <div class="ttl">${esc(n.fm.title)}</div>
+        <div>${n.fm.tags.map(t => `<span class="tag">${esc(t)}</span>`).join("")}<span class="tag" style="background:#fdf3e0; color:#9a6414;">${statusLabel(n.fm.status)}</span></div>
+        <div class="ex">${esc(excerptOf(parseBlocks(n.body), 90))}</div>
+      </div>`;
+    }).join("")}
+    </div></div>`;
+}
+function afterCanvasRender(){ /* 位置はHTMLに直接書くため追加処理なし */ }
+/* ============ AI接続（任意・既定OFF／キーは端末内のみ） ============ */
+const KAIRO_AI_KEY = "kairo-ai-v1";
+const AI_DEFAULTS = {
+  gemini: { model: "gemini-3.6-flash", base: "" },
+  openai: { model: "gpt-4o-mini", base: "" },
+  claude: { model: "claude-sonnet-4-5", base: "" },
+  compat: { model: "", base: "" },
+  ollama: { model: "qwen3-vl:8b", base: "http://localhost:11434" }
+};
+const AI_LABELS = { gemini: "Google Gemini", openai: "OpenAI", claude: "Anthropic Claude", compat: "OpenAI互換", ollama: "Ollama（ローカル）" };
+const AI_NOTES = {
+  gemini: "Google AI Studioで取得したAPIキーを貼ってください。キーはこの端末の中にだけ保存されます。",
+  openai: "OpenAIのAPIキーを貼ってください。キーはこの端末の中にだけ保存されます。",
+  claude: "AnthropicのAPIキーを貼ってください。キーはこの端末の中にだけ保存されます。",
+  compat: "OpenAI互換APIのベースURLとモデル名、APIキーを入れてください。",
+  ollama: "自分のパソコンでOllamaが動いているとき向けです（キー不要）。このアプリはインターネット上のページから動くため、PC・iPhoneどちらでも、Ollama側の接続許可が必要です。パソコンで環境変数 OLLAMA_ORIGINS=* を設定してOllamaを再起動してください。iPhoneから使う場合は OLLAMA_HOST=0.0.0.0:11434 も追加し、ベースURLをPCのアドレス（例：http://192.168.1.10:11434）に変えます。画像対応でなくてよいので、文章を読めるモデルを選んでください。"
+};
+function aiLoad(){
+  let s = null;
+  try{ s = JSON.parse(localStorage.getItem(KAIRO_AI_KEY) || "null"); }catch(e){}
+  if(!s || typeof s !== "object") s = {};
+  if(typeof s.enabled !== "boolean") s.enabled = false;
+  if(!AI_DEFAULTS[s.provider]) s.provider = "gemini";
+  if(!s.providers) s.providers = {};
+  for(const k of Object.keys(AI_DEFAULTS)){
+    if(!s.providers[k]) s.providers[k] = { key: "", model: AI_DEFAULTS[k].model, base: AI_DEFAULTS[k].base };
+  }
+  return s;
+}
+let aiSet = aiLoad();
+function aiSave(){ try{ localStorage.setItem(KAIRO_AI_KEY, JSON.stringify(aiSet)); }catch(e){} }
+const aiCfg = () => aiSet.providers[aiSet.provider];
+const aiReady = () => aiSet.enabled && (aiSet.provider === "ollama" || (aiCfg().key || "").trim().length > 0) && (aiCfg().model || "").trim().length > 0;
+function aiSetEnabled(v){ aiSet.enabled = !!v; aiSave(); render(); }
+function aiSetProvider(v){ aiReadForm(); aiSet.provider = v; aiSave(); render(); }
+function aiReadForm(){
+  const k = document.getElementById("aiKey"); if(k) aiCfg().key = k.value;
+  const m = document.getElementById("aiModel"); if(m) aiCfg().model = m.value;
+  const b = document.getElementById("aiBase"); if(b) aiCfg().base = b.value;
+}
+function aiFormChanged(){ aiReadForm(); aiSave(); }
+async function fetchJsonT(url, opts, timeoutMs){
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), timeoutMs || 120000);
+  try{
+    const r = await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
+    const text = await r.text();
+    let json = null;
+    try{ json = JSON.parse(text); }catch(e){}
+    if(!r.ok) throw new Error("HTTP " + r.status + (json && json.error && json.error.message ? "：" + json.error.message : ""));
+    return json;
+  } finally { clearTimeout(to); }
+}
+function aiErrText(e){
+  const m = String((e && e.message) || e || "");
+  if((e && e.name === "AbortError") || m.includes("aborted")){
+    if(aiSet.provider === "ollama") return "時間がかかりすぎたため中断しました。ローカルAIの初回はモデルの読み込みに時間がかかります。読み込みが終わったあとは速くなるので、もう一度お試しください。";
+    return "時間がかかりすぎたため中断しました。通信環境を確認して、もう一度お試しください。";
+  }
+  if(m.includes("Failed to fetch") || m.includes("NetworkError") || m.includes("Load failed")){
+    if(aiSet.provider === "ollama") return "通信できませんでした。Ollamaが起動していないか、接続許可（環境変数 OLLAMA_ORIGINS=*）の設定が不足している可能性があります。Ollamaを起動し、設定後に再起動してから、もう一度お試しください。";
+    return "通信できませんでした。ネット接続と、キー・接続先の設定を確認して、もう一度お試しください。";
+  }
+  return "AIへの依頼に失敗しました：" + m;
+}
+async function aiAsk(prompt){
+  const p = aiSet.provider, cfg = aiCfg();
+  const model = (cfg.model || "").trim();
+  const timeout = p === "ollama" ? 600000 : 120000;
+  if(p === "gemini"){
+    const j = await fetchJsonT("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(cfg.key.trim()), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } })
+    }, timeout);
+    const t = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts.map(x => x.text || "").join("");
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  if(p === "claude"){
+    const j = await fetchJsonT("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": cfg.key.trim(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model, max_tokens: 4000, messages: [{ role: "user", content: prompt }] })
+    }, timeout);
+    const t = (j.content || []).map(x => x.text || "").join("");
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  if(p === "ollama"){
+    const base = (cfg.base || "http://localhost:11434").replace(/\/+$/, "");
+    const j = await fetchJsonT(base + "/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, stream: false, messages: [{ role: "user", content: prompt }] })
+    }, timeout);
+    const t = j.message && j.message.content;
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  const base = p === "compat" ? (cfg.base || "").replace(/\/+$/, "") : "https://api.openai.com/v1";
+  if(!base) throw new Error("ベースURLが未設定です");
+  const j = await fetchJsonT(base + "/chat/completions", {
+    method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cfg.key.trim() },
+    body: JSON.stringify({ model, temperature: 0.3, messages: [{ role: "user", content: prompt }] })
+  }, timeout);
+  const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if(!t) throw new Error("AIの返答が空でした");
+  return t;
+}
+function aiSettingsCardHtml(){
+  const p = aiSet.provider;
+  return `<div class="card">
+    <h2>🤖 AI接続設定（任意）</h2>
+    <label class="checkrow"><input type="checkbox" id="aiEnabled" ${aiSet.enabled ? "checked" : ""} onchange="aiSetEnabled(this.checked)"><span>AI整理を使う（初期設定はOFFです）</span></label>
+    <label class="flabel">接続先</label>
+    <select id="aiProvider" onchange="aiSetProvider(this.value)">
+      ${Object.keys(AI_LABELS).map(k => `<option value="${k}" ${p === k ? "selected" : ""}>${AI_LABELS[k]}</option>`).join("")}
+    </select>
+    ${p !== "ollama" ? `<label class="flabel">APIキー（この端末の中にだけ保存されます）</label>
+    <input type="password" id="aiKey" value="${esc(aiCfg().key)}" onchange="aiFormChanged()" placeholder="キーを貼ってください" autocomplete="off">` : ""}
+    <label class="flabel">モデル名</label>
+    <input type="text" id="aiModel" value="${esc(aiCfg().model)}" onchange="aiFormChanged()">
+    ${(p === "compat" || p === "ollama") ? `<label class="flabel">ベースURL</label>
+    <input type="text" id="aiBase" value="${esc(aiCfg().base)}" onchange="aiFormChanged()">` : ""}
+    <p class="small">${AI_NOTES[p]}</p>
+  </div>`;
+}
+function settingsViewHtml(){
+  return `<h2 style="margin:4px 0 12px;">⚙ 設定</h2>
+  ${aiSettingsCardHtml()}
+  <div class="card">
+    <h2>📦 データについて</h2>
+    <p class="small">ノートは ${notes.length} 件、この端末のIndexedDBに保存されています。本文はフロントマター付きの素のMarkdownです。「文書」画面の「⬇ 全て書き出し」で、いつでも持ち出せます。</p>
+    <div class="btnrow"><button class="btn sub" onclick="openExportAll()">⬇ 全て書き出し</button>
+    <button class="btn sub" onclick="go('ai')">🤖 AI整理とロールバック</button></div>
+  </div>
+  <div class="card">
+    <h2>ℹ️ このアプリについて</h2>
+    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第1期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計です。</p>
+  </div>`;
+}
+/* ============ AI Librarian（差分プレビュー→承認→実行／ロールバック） ============ */
+let proposal = null;      /* {actions:[...]} AIの下書き。実行するまで実データは変わらない */
+let aiBusy = false;
+let aiNote = "";
+const PRESETS = {
+  merge: "対象のノートを、内容を失わないように1つのノートに統合する案を作ってください。",
+  dedup: "対象のノートの重複や重なりを整理する案を作ってください（重複分は統合、足りない分は補う）。",
+  link: "対象のノート同士の関連を見つけて、リンク提案（link）を中心に作ってください。",
+  tags: "対象のノートのタグとタイトルを整える案を作ってください（updateで提案）。"
+};
+function aiViewHtml(){
+  const snaps = window.__snaps || [];
+  let h = `<h2 style="margin:4px 0 12px;">🤖 AI整理（Librarian）</h2>`;
+  if(!aiSet.enabled){
+    h += `<div class="card"><h2>AI整理はOFFです</h2>
+    <p class="small">AI整理は任意機能です。使う場合は、設定でAI接続をONにして、ご自身のAPIキー（またはOllama）を設定してください。キーはこの端末の中にだけ保存されます。</p>
+    <div class="btnrow"><button class="btn" onclick="go('settings')">⚙ 設定を開く</button></div></div>`;
+  } else {
+    h += `<div class="card">
+      <h2>① 対象のノート</h2>
+      <p class="small">整理の対象にするノートにチェックを入れてください。文書画面の「関連する過去メモ」から追加したノートには、すでにチェックが入っています。</p>
+      ${sortedNotes().map(n => `<label class="targetitem"><input type="checkbox" ${aiTargets.has(n.id) ? "checked" : ""} onchange="toggleAiTarget('${n.id}')"><span><strong>${esc(n.fm.title)}</strong> <span class="small">${n.fm.tags.map(esc).join("、")} ／ ${statusLabel(n.fm.status)}</span></span></label>`).join("") || `<p class="small">ノートがありません。</p>`}
+    </div>
+    <div class="card">
+      <h2>② 依頼（自然な言葉で）</h2>
+      <div class="btnrow">
+        <button class="btn sub" onclick="setPreset('merge')">🧩 統合する</button>
+        <button class="btn sub" onclick="setPreset('dedup')">🧹 重複を整理</button>
+        <button class="btn sub" onclick="setPreset('link')">🔗 リンク提案</button>
+        <button class="btn sub" onclick="setPreset('tags')">🏷 タグを整える</button>
+      </div>
+      <textarea id="aiInstruction" rows="3" placeholder="例：買い物に関するメモを1つにまとめてください">${esc(window.__instruction || "")}</textarea>
+      <div class="btnrow"><button class="btn" id="aiRunBtn" ${aiBusy ? "disabled" : ""} onclick="runLibrarian()">${aiBusy ? "AIが考えています…" : "AIに整理案を作らせる"}</button></div>
+      <div id="aiMsg">${aiNote ? `<div class="msg">${esc(aiNote)}</div>` : ""}</div>
+      <p class="small">AIの案は下書きです。下の差分プレビューで確認し、承認したものだけが実行されます。実行の直前に控え（スナップショット）が残ります。</p>
+    </div>`;
+    if(proposal) h += proposalHtml();
+  }
+  h += `<div class="card">
+    <h2>↩️ スナップショットとロールバック</h2>
+    <p class="small">AI整理を実行する直前の状態の控えです。ロールバックすると、その時点のノート一式に戻ります（最大5件）。</p>
+    ${snaps.length ? snaps.map(s => `<div class="relitem"><div class="ttl">${esc(s.label)}</div><div class="small">${fmtDate(s.ts)} ／ ノート ${s.notes.length} 件</div>
+      <div class="btnrow" style="margin:6px 0 0;"><button class="btn warn" style="min-height:40px; font-size:14px;" onclick="rollbackSnapshot('${s.id}')">↩️ ここに戻す</button>
+      <button class="btn ghost" style="min-height:40px; font-size:14px;" onclick="deleteSnapshot('${s.id}')">控えを消す</button></div></div>`).join("")
+    : `<p class="small">まだ控えはありません。</p>`}
+  </div>`;
+  return h;
+}
+function setPreset(k){
+  const ta = document.getElementById("aiInstruction");
+  if(ta){ ta.value = PRESETS[k]; window.__instruction = PRESETS[k]; }
+}
+function buildPrompt(instruction, targets){
+  const data = targets.map(n => "### ノート\nid: " + n.id + "\ntitle: " + n.fm.title + "\ntags: " + n.fm.tags.join(", ") + "\nstatus: " + n.fm.status + "\n本文:\n" + n.body).join("\n\n");
+  return "あなたはノート整理の司書です。利用者の依頼に沿って、ノートの整理案をJSONだけ（説明文やコードフェンスなし）で返してください。\n\n"
+    + "依頼：" + instruction + "\n\n"
+    + "返せるアクションの形式：\n"
+    + "- 統合: {\"type\":\"merge\",\"title\":\"統合後のタイトル\",\"tags\":[\"...\"],\"status\":\"idea\",\"body\":\"統合後のMarkdown本文\",\"sourceIds\":[\"id1\",\"id2\"]}\n"
+    + "- 更新: {\"type\":\"update\",\"id\":\"対象id\",\"title\":\"新しいタイトル（任意）\",\"tags\":[\"...\"],\"status\":\"doing\",\"body\":\"新しい本文（任意）\"}\n"
+    + "- 新規: {\"type\":\"create\",\"title\":\"...\",\"tags\":[\"...\"],\"body\":\"...\"}\n"
+    + "- リンク提案: {\"type\":\"link\",\"fromId\":\"...\",\"toId\":\"...\",\"reason\":\"理由\"}\n"
+    + "全体は {\"actions\":[...]} の形。統合では元の内容を失わないこと。対象ノートにないidは使わないこと。最小限のアクションにすること。\n\n対象ノート:\n" + data;
+}
+function parseProposal(text){
+  let t = String(text || "").trim();
+  t = t.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  const s = t.indexOf("{"), e = t.lastIndexOf("}");
+  if(s < 0 || e <= s) throw new Error("AIの返答を読み取れませんでした");
+  const obj = JSON.parse(t.slice(s, e + 1));
+  if(!obj || !Array.isArray(obj.actions)) throw new Error("AIの返答に actions がありませんでした");
+  const ok = [];
+  for(const a of obj.actions){
+    if(!a || typeof a !== "object") continue;
+    if(a.type === "merge" && a.title && a.body) ok.push({ type: "merge", title: String(a.title), tags: Array.isArray(a.tags) ? a.tags.map(String) : [], status: STATUSES[a.status] ? a.status : "idea", body: String(a.body), sourceIds: Array.isArray(a.sourceIds) ? a.sourceIds.filter(id => getNote(id)) : [] });
+    else if(a.type === "update" && a.id && getNote(a.id)) ok.push({ type: "update", id: a.id, title: a.title ? String(a.title) : null, tags: Array.isArray(a.tags) ? a.tags.map(String) : null, status: STATUSES[a.status] ? a.status : null, body: a.body != null ? String(a.body) : null });
+    else if(a.type === "create" && a.title && a.body) ok.push({ type: "create", title: String(a.title), tags: Array.isArray(a.tags) ? a.tags.map(String) : [], body: String(a.body) });
+    else if(a.type === "link" && a.fromId && a.toId && getNote(a.fromId) && getNote(a.toId) && a.fromId !== a.toId) ok.push({ type: "link", fromId: a.fromId, toId: a.toId, reason: String(a.reason || "") });
+  }
+  if(!ok.length) throw new Error("実行できる整理案がありませんでした");
+  return { actions: ok };
+}
+async function runLibrarian(){
+  if(aiBusy) return;
+  if(!aiReady()){ aiNote = "AI設定が未完了です。設定で接続先とキーを確認してください。"; render(); return; }
+  const ta = document.getElementById("aiInstruction");
+  const instruction = ta ? ta.value.trim() : "";
+  window.__instruction = instruction;
+  if(!instruction){ aiNote = "依頼を書いてください（ボタンのプリセットでも構いません）。"; render(); return; }
+  const targets = notes.filter(n => aiTargets.has(n.id));
+  if(!targets.length){ aiNote = "対象のノートにチェックを入れてください。"; render(); return; }
+  aiBusy = true; aiNote = ""; render();
+  try{
+    const text = await aiAsk(buildPrompt(instruction, targets));
+    proposal = parseProposal(text);
+    aiNote = "整理案ができました。下の差分プレビューで確認してください。まだ何も変更されていません。";
+  }catch(e){ aiNote = aiErrText(e); }
+  aiBusy = false;
+  render();
+}
+/* ---- 差分表示 ---- */
+function diffLines(a, b){
+  const A = String(a).split("\n"), B = String(b).split("\n");
+  if(A.length * B.length > 120000) return null;
+  const dp = [];
+  for(let i = 0; i <= A.length; i++) dp.push(new Uint32Array(B.length + 1));
+  for(let i = A.length - 1; i >= 0; i--) for(let j = B.length - 1; j >= 0; j--)
+    dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = []; let i = 0, j = 0;
+  while(i < A.length && j < B.length){
+    if(A[i] === B[j]){ out.push({ t: " ", s: A[i] }); i++; j++; }
+    else if(dp[i + 1][j] >= dp[i][j + 1]){ out.push({ t: "-", s: A[i] }); i++; }
+    else { out.push({ t: "+", s: B[j] }); j++; }
+  }
+  while(i < A.length) out.push({ t: "-", s: A[i++] });
+  while(j < B.length) out.push({ t: "+", s: B[j++] });
+  return out;
+}
+function diffHtml(oldText, newText){
+  const d = diffLines(oldText, newText);
+  if(!d) return `<div class="diffbox">（大きな変更です：${String(oldText).split("\n").length}行 → ${String(newText).split("\n").length}行）</div>`;
+  const shown = d.slice(0, 120);
+  return `<div class="diffbox">${shown.map(l => `<div class="${l.t === "-" ? "dl-del" : l.t === "+" ? "dl-add" : ""}">${l.t === " " ? "　" : l.t} ${esc(l.s)}</div>`).join("")}${d.length > 120 ? `<div>…ほか ${d.length - 120} 行</div>` : ""}</div>`;
+}
+function actionTitle(a){
+  if(a.type === "merge") return "🧩 統合：新しいノート「" + a.title + "」を作る";
+  if(a.type === "update") return "✏️ 更新：「" + (getNote(a.id) || { fm: { title: "" } }).fm.title + "」を変更";
+  if(a.type === "create") return "📄 新規：「" + a.title + "」を作る";
+  if(a.type === "link") return "🔗 リンク：「" + (getNote(a.fromId) || { fm: { title: "" } }).fm.title + "」→「" + (getNote(a.toId) || { fm: { title: "" } }).fm.title + "」";
+  return a.type;
+}
+function actionDetailHtml(a){
+  if(a.type === "merge"){
+    return `<p class="small">元になるノート：${a.sourceIds.map(id => esc((getNote(id) || { fm: { title: id } }).fm.title)).join("、") || "（指定なし）"}<br>元のノートはそのまま残ります。タグ：${a.tags.map(esc).join("、")}</p>` + diffHtml("", a.body);
+  }
+  if(a.type === "create"){
+    return `<p class="small">タグ：${a.tags.map(esc).join("、")}</p>` + diffHtml("", a.body);
+  }
+  if(a.type === "update"){
+    const n = getNote(a.id); if(!n) return "";
+    let h = "";
+    if(a.title && a.title !== n.fm.title) h += `<p class="small">タイトル：「${esc(n.fm.title)}」→「${esc(a.title)}」</p>`;
+    if(a.tags) h += `<p class="small">タグ：「${esc(n.fm.tags.join("、"))}」→「${esc(a.tags.join("、"))}」</p>`;
+    if(a.status) h += `<p class="small">状態：${statusLabel(n.fm.status)} → ${statusLabel(a.status)}</p>`;
+    if(a.body != null) h += diffHtml(n.body, a.body);
+    return h || `<p class="small">（実質的な変更はありません）</p>`;
+  }
+  if(a.type === "link"){
+    const from = getNote(a.fromId), to = getNote(a.toId);
+    return `<p class="small">理由：${esc(a.reason)}<br>「${esc(from.fm.title)}」の末尾に「## 関連メモ」として「${esc(to.fm.title)}」への言及を追加します。</p>`;
+  }
+  return "";
+}
+function proposalHtml(){
+  return `<div class="card">
+    <h2>③ 差分プレビュー（承認したものだけ実行）</h2>
+    ${proposal.actions.map((a, i) => `<div class="actitem">
+      <label class="checkrow"><input type="checkbox" id="act-${i}" checked><span><strong>${esc(actionTitle(a))}</strong></span></label>
+      <div style="margin-top:8px;">${actionDetailHtml(a)}</div>
+    </div>`).join("")}
+    <div class="btnrow">
+      <button class="btn" onclick="executeProposal()">✓ 承認したものを実行する</button>
+      <button class="btn ghost" onclick="discardProposal()">案を破棄する</button>
+    </div>
+    <p class="small">実行の直前に、現在のノート一式の控え（スナップショット）が自動で残ります。</p>
+  </div>`;
+}
+function discardProposal(){ proposal = null; aiNote = "整理案を破棄しました。ノートは変更されていません。"; render(); }
+/* ---- スナップショット ---- */
+async function loadSnaps(){ window.__snaps = await metaGet("snapshots", []); }
+async function takeSnapshot(label){
+  const snaps = await metaGet("snapshots", []);
+  snaps.unshift({ id: uid(), ts: nowIso(), label, notes: notes.map(n => ({ id: n.id, md: noteToMd(n) })) });
+  while(snaps.length > 5) snaps.pop();
+  await metaSet("snapshots", snaps);
+  window.__snaps = snaps;
+}
+async function rollbackSnapshot(id){
+  const snaps = await metaGet("snapshots", []);
+  const s = snaps.find(x => x.id === id);
+  if(!s) return;
+  if(!confirm("「" + s.label + "」の時点（ノート" + s.notes.length + "件）に戻しますか？現在のノート一式は置き換わります。")) return;
+  await replaceAllNotes(s.notes.map(r => parseNote(r.id, r.md)));
+  proposal = null;
+  aiNote = "ロールバックしました（" + s.label + "）。";
+  render();
+}
+async function deleteSnapshot(id){
+  const snaps = (await metaGet("snapshots", [])).filter(x => x.id !== id);
+  await metaSet("snapshots", snaps);
+  window.__snaps = snaps;
+  render();
+}
+/* ---- 実行 ---- */
+async function applyAction(a){
+  if(a.type === "merge"){
+    await createNote(a.title, a.body, a.tags, a.status);
+  } else if(a.type === "create"){
+    await createNote(a.title, a.body, a.tags, "idea");
+  } else if(a.type === "update"){
+    const n = getNote(a.id); if(!n) return;
+    if(a.title) n.fm.title = a.title;
+    if(a.tags) n.fm.tags = a.tags;
+    if(a.status) n.fm.status = a.status;
+    if(a.body != null) n.body = a.body;
+    await persistNote(n);
+  } else if(a.type === "link"){
+    const from = getNote(a.fromId), to = getNote(a.toId);
+    if(!from || !to) return;
+    const line = "- 『" + to.fm.title + "』" + (a.reason ? " ― " + a.reason : "");
+    if(from.body.includes("## 関連メモ")) from.body = from.body.replace(/\s*$/, "") + "\n" + line + "\n";
+    else from.body = from.body.replace(/\s*$/, "") + "\n\n## 関連メモ\n" + line + "\n";
+    await persistNote(from);
+  }
+}
+async function executeProposal(){
+  if(!proposal) return;
+  const chosen = proposal.actions.filter((a, i) => {
+    const el = document.getElementById("act-" + i);
+    return el && el.checked;
+  });
+  if(!chosen.length){ alert("実行する案にチェックを入れてください。"); return; }
+  if(!confirm(chosen.length + "件の整理を実行しますか？実行前に控え（スナップショット）が残ります。")) return;
+  await takeSnapshot("AI整理の実行前（" + chosen.length + "件）");
+  for(const a of chosen) await applyAction(a);
+  proposal = null;
+  aiNote = chosen.length + "件の整理を実行しました。元に戻したいときは、下のスナップショットからロールバックできます。";
+  render();
+}
+/* ============ 起動 ============ */
+async function boot(){
+  document.getElementById("verFoot").textContent = APP_VER;
+  const rows = await idbAll("notes");
+  notes = rows.map(r => parseNote(r.id, r.md));
+  canvasPos = await metaGet("canvasPos", {});
+  await loadSnaps();
+  const seeded = await metaGet("seeded", false);
+  if(!seeded && notes.length === 0) await seedSamples();
+  if(notes.length && !currentId) currentId = sortedNotes()[0].id;
+  render();
+  if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+boot();
+</script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+{"background_color":"#f7f5ef","description":"標準Markdownを基盤にした、ローカルファーストのノートアプリ。文書・ボード・キャンバスの3視点と、非破壊のAI整理。","display":"standalone","icons":[{"sizes":"192x192","src":"icon-192.png","type":"image/png"},{"sizes":"512x512","src":"icon-512.png","type":"image/png"}],"name":"Kairo ノート ― MarkdownノートOS","scope":"./","short_name":"Kairo","start_url":"./","theme_color":"#2f6f6a"}
