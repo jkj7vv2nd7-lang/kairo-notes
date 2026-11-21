@@ -39,7 +39,7 @@ header.top .sp{ flex:1; }
 .focusbody .fpreview{ flex:1; max-width:760px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; font-size:17px; }
 main{ padding:14px 14px 110px; max-width:1180px; margin:0 auto; }
 .bottombar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdf8; border-top:1px solid var(--line); display:flex; gap:6px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow:0 -3px 14px rgba(60,50,20,.08); }
-.bottombar button{ flex:1; min-height:54px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; padding:4px 2px; }
+.bottombar button{ flex:1; min-height:54px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:13.5px; line-height:1.3; font-weight:700; color:var(--ink); cursor:pointer; padding:4px 2px; }
 .bottombar button.on{ background:var(--teal); border-color:var(--teal); color:#fff; }
 .bottombar button.new{ background:linear-gradient(135deg, #f0b95a, #dd9222); border-color:#dd9222; color:#2e2766; }
 .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px; }
@@ -222,6 +222,15 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .waittip{ font-size:13.5px; color:var(--muted); line-height:1.6; min-height:44px; }
 
 #printArea{ display:none; }
+.corrwrap{ position:relative; padding:2px 2px 6px 30px; }
+.corrwrap::before{ content:""; position:absolute; left:11px; top:8px; bottom:8px; width:3px; border-radius:2px; background:linear-gradient(180deg, var(--teal), var(--accent)); opacity:.5; }
+.corrmonth{ position:relative; display:inline-block; background:var(--teal); color:#fff; font-weight:800; font-size:15.5px; padding:6px 14px; border-radius:999px; margin:18px 0 10px; }
+.corrmonth::before{ content:""; position:absolute; left:-25px; top:50%; transform:translateY(-50%); width:13px; height:13px; border-radius:50%; background:var(--accent); border:2.5px solid #fff; box-shadow:0 0 0 2px var(--accent); }
+.corrcard{ position:relative; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:10px; cursor:pointer; box-shadow:0 2px 8px rgba(46,39,102,.06); }
+.corrcard::before{ content:""; position:absolute; left:-24px; top:20px; width:9px; height:9px; border-radius:50%; background:#fff; border:2.5px solid var(--teal); }
+.corrcard .ct{ font-weight:800; font-size:16.5px; }
+.corrcard .cm{ color:var(--muted); font-size:12.5px; margin-top:2px; }
+.corrcard .cx{ color:#4c4763; font-size:14px; line-height:1.65; margin-top:5px; }
 @media print{
   body.printing-note header.top, body.printing-note main, body.printing-note footer, body.printing-note .bottombar,
   body.printing-note #modalRoot, body.printing-note #focusRoot, body.printing-note #waitRoot{ display:none !important; }
@@ -257,7 +266,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.8.0";
+const APP_VER = "1.9.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -273,7 +282,7 @@ let FS = "std";
 try{ FS = localStorage.getItem("kairo-fs") || "std"; }catch(e){}
 const STR = {
   nav_new: ["＋ 新規", "+ New"], nav_doc: ["📄 文書", "📄 Notes"], nav_board: ["📋 ボード", "📋 Board"],
-  nav_canvas: ["🗂 キャンバス", "🗂 Canvas"], nav_map: ["🗺 マップ", "🗺 Map"], nav_ai: ["🤖 AI整理", "🤖 AI"],
+  nav_canvas: ["🗂 キャンバス", "🗂 Canvas"], nav_corridor: ["🚶 回廊", "🚶 Corridor"], nav_map: ["🗺 マップ", "🗺 Map"], nav_ai: ["🤖 AI整理", "🤖 AI"],
   hdr_tag: ["MarkdownノートOS ― 記録と整理を分断しない", "Markdown Note OS — capture and organize, undivided"],
   foot_note: ["／ ノートはこの端末の中（IndexedDB）にだけ保存されます", "— notes are stored only on this device (IndexedDB)"],
   upd_btn: ["最新の版に更新する", "Update to the latest version"],
@@ -377,7 +386,10 @@ const STR = {
   q_need_ai: ["問いかけにはAI接続が必要です", "Questions need an AI connection"],
   q_need_ai_desc: ["AI「問いかけ」は任意機能です。設定でAI接続をONにして、ご自身のAPIキー（またはOllama）を設定すると使えます。キーはこの端末の中にだけ保存されます。", "Questions are optional. Turn on the AI connection in Settings with your own API key (or Ollama) to use them. Keys are stored only on this device."],
   q_failed: ["問いかけを作れませんでした：", "Could not create questions: "],
-  cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], cmp_title: ["📚 テーマ別まとめ書き出し", "📚 Compilation export"],
+  cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
+  cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
+  book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  cmp_title: ["📚 テーマ別まとめ書き出し", "📚 Compilation export"],
   cmp_lead: ["タグや個別の選択でノートを選び、目次つきの1つの文書にまとめて書き出します。人が読むための清書形式です（AIへの受け渡しとは別の機能です）。", "Pick notes by tag or individually and export them as one document with a table of contents, formatted for reading (separate from the AI handoff)."],
   cmp_by_tag: ["タグで選ぶ（タップでまとめて選択）", "Pick by tag (tap to select all)"], cmp_notes: ["ノートを選ぶ", "Choose notes"],
   cmp_all: ["すべて選択", "Select all"], cmp_none: ["すべて解除", "Clear"],
@@ -396,6 +408,7 @@ const STR = {
   tip_doc: ["ノートの一覧と編集。書く・直す・探す場所です", "List and edit your notes — where you write, revise, and search"],
   tip_board: ["状態（アイデア／進行中／完了／保管）ごとにカードで並べます", "Cards grouped by status (Idea / In progress / Done / Archived)"],
   tip_canvas: ["カードを自由な位置に置いて眺められます", "Arrange cards freely on a board"],
+  tip_corridor: ["ノートを時間の流れに沿って眺めます", "Walk through your notes along the flow of time"],
   tip_map: ["ノート同士のリンクを地図で見ます", "See how your notes link to each other, as a map"],
   tip_ai: ["AIに整理案を作らせる場所（任意・差分確認つき）", "Ask AI to propose organization (optional, diff-reviewed)"],
   tip_settings: ["AI接続・表示と言語・文字サイズなどの設定", "AI connection, language, text size, and more"]
@@ -771,6 +784,7 @@ function renderBottom(){
     { k: "doc", label: t("nav_doc") },
     { k: "board", label: t("nav_board") },
     { k: "canvas", label: t("nav_canvas") },
+    { k: "corridor", label: t("nav_corridor") },
     { k: "map", label: t("nav_map") },
     { k: "ai", label: t("nav_ai") }
   ];
@@ -799,6 +813,7 @@ function renderTopNav(){
     { k: "doc", label: t("nav_doc"), tip: t("tip_doc") },
     { k: "board", label: t("nav_board"), tip: t("tip_board") },
     { k: "canvas", label: t("nav_canvas"), tip: t("tip_canvas") },
+    { k: "corridor", label: t("nav_corridor"), tip: t("tip_corridor") },
     { k: "map", label: t("nav_map"), tip: t("tip_map") },
     { k: "ai", label: t("nav_ai"), tip: t("tip_ai") },
     { k: "settings", label: t("settings_btn"), tip: t("tip_settings") }
@@ -821,6 +836,7 @@ function render(){
   if(view === "doc") app.innerHTML = docViewHtml();
   else if(view === "board") app.innerHTML = boardViewHtml();
   else if(view === "canvas"){ app.innerHTML = canvasViewHtml(); afterCanvasRender(); }
+  else if(view === "corridor") app.innerHTML = corridorViewHtml();
   else if(view === "map"){ app.innerHTML = mapViewHtml(); afterMapRender(); }
   else if(view === "ai") app.innerHTML = aiViewHtml();
   else if(view === "settings") app.innerHTML = settingsViewHtml();
@@ -1292,7 +1308,7 @@ function bodyForExport(n){
 /* ============ テーマ別まとめ書き出し（第9期） ============ */
 let cmpState = null;
 function openCompile(){
-  cmpState = { sel: new Set(), sort: "title", title: "" };
+  cmpState = { sel: new Set(), sort: "title", title: "", format: "md" };
   renderCompileModal();
 }
 function renderCompileModal(){
@@ -1306,6 +1322,8 @@ function renderCompileModal(){
   <div class="btnrow"><button class="btn sub" onclick="cmpAll(true)">${t("cmp_all")}</button><button class="btn sub" onclick="cmpAll(false)">${t("cmp_none")}</button></div>
   <label class="flabel">${t("cmp_sort")}</label>
   <div class="seg2"><button class="${cs.sort === "title" ? "on" : ""}" onclick="cmpSetSort('title')">${t("sort_title")}</button><button class="${cs.sort === "updated" ? "on" : ""}" onclick="cmpSetSort('updated')">${t("sort_updated")}</button></div>
+  <label class="flabel">${t("cmp_format")}</label>
+  <div class="seg2"><button class="${cs.format === "md" ? "on" : ""}" onclick="cmpSetFormat('md')">${t("cmp_fmt_md")}</button><button class="${cs.format === "html" ? "on" : ""}" onclick="cmpSetFormat('html')">${t("cmp_fmt_html")}</button></div>
   <label class="flabel">${t("cmp_name")}</label>
   <input type="text" id="cmpTitle" value="${esc(cs.title)}" placeholder="${t("cmp_name_ph")}" oninput="cmpState.title = this.value">
   <div id="cmpMsg"></div>
@@ -1337,12 +1355,17 @@ function cmpPickTag(i){
   renderCompileModal();
 }
 function cmpSetSort(v){ if(!cmpState) return; cmpState.sort = v; renderCompileModal(); }
-function buildCompilation(){
-  const cs = cmpState;
+function cmpSetFormat(v){ if(!cmpState) return; cmpState.format = v; renderCompileModal(); }
+function cmpOrderedNotes(){
+  const cs = cmpState; if(!cs) return [];
   const picked = notes.filter(n => cs.sel.has(n.id));
-  const sorted = picked.slice().sort(cs.sort === "title"
+  return picked.slice().sort(cs.sort === "title"
     ? (a, b) => a.fm.title.localeCompare(b.fm.title, "ja")
     : (a, b) => String(b.fm.updated).localeCompare(String(a.fm.updated)));
+}
+function buildCompilation(){
+  const cs = cmpState;
+  const sorted = cmpOrderedNotes();
   const title = (cs.title || "").trim() || t("cmp_default_title");
   const today = fmtDate(new Date().toISOString()).slice(0, 10);
   let out = "# " + title + "\n\n" + today + (LANG === "en" ? " · " + sorted.length + " notes" : " ・ " + sorted.length + "件のノート") + "\n\n## " + t("cmp_toc") + "\n\n"
@@ -1364,10 +1387,69 @@ function cmpExport(){
     if(m) m.innerHTML = `<div class="msg">${t("cmp_empty")}</div>`;
     return;
   }
-  const built = buildCompilation();
-  shareOrDownload(built.title.replace(/[\\/:*?"<>|]/g, "_") + ".md", built.text);
+  const built = cmpState.format === "html" ? buildMiniBook() : buildCompilation();
+  shareOrDownload(built.title.replace(/[\\/:*?"<>|]/g, "_") + (cmpState.format === "html" ? ".html" : ".md"), built.text);
   const m = document.getElementById("cmpMsg");
   if(m) m.innerHTML = `<div class="msg">${esc(t("cmp_done").replace("{n}", built.count))}</div>`;
+}
+const BOOK_CSS = "*{box-sizing:border-box}body{margin:0;background:#f5f3fa;color:#28243c;font-family:-apple-system,'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP',sans-serif;line-height:1.9}.cover{background:linear-gradient(118deg,#221d54,#3d348b 55%,#5b2a86);color:#fff;padding:56px 22px 44px;text-align:center;border-bottom:4px solid #e8a33d}.cover h1{margin:0 0 10px;font-size:30px;line-height:1.4}.cover .cmeta{opacity:.85;font-size:14px}.wrap{max-width:720px;margin:0 auto;padding:26px 20px 60px}.toc{background:#fffefa;border:1px solid #d9d4e8;border-radius:14px;padding:18px 22px;margin-bottom:30px}.toc h2{margin:0 0 8px;font-size:18px;color:#3d348b}.toc ol{margin:0;padding-left:22px}.toc a{color:#3d348b;text-decoration:none}.toc a:hover{text-decoration:underline}section{background:#fffefa;border:1px solid #d9d4e8;border-radius:14px;padding:22px 24px;margin-bottom:22px}section h2{margin:0 0 4px;font-size:22px;color:#2e2766;border-bottom:2px solid #e8a33d;padding-bottom:8px}.bmeta{color:#6f6a85;font-size:13px;margin:6px 0 14px}section h3{color:#3d348b;margin:20px 0 6px}section img{max-width:100%;border-radius:8px}section pre{background:#2e2766;color:#f5f3fa;padding:14px;border-radius:10px;overflow:auto;line-height:1.6}section code{background:#efeafd;border-radius:5px;padding:1px 5px}section pre code{background:none;padding:0}section blockquote{border-left:4px solid #e8a33d;margin:12px 0;padding:4px 14px;color:#4c4763;background:#fdf6e3}a.blink{color:#3d348b;font-weight:700}.bmiss{color:#a49dc4}footer{text-align:center;color:#6f6a85;font-size:12.5px;padding:0 20px 40px}";
+function inlineBook(s, anchors){
+  let t = esc(s);
+  t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => {
+    if(src.startsWith("kairo-img:")){
+      const url = imgCache[src.slice(10)] || "";
+      return url ? `<img src="${url}" alt="${alt}">` : `<span class="bmiss">（${alt || "手書き画像"}）</span>`;
+    }
+    if(/^(https:|data:image\/)/.test(src)) return `<img src="${src}" alt="${alt}">`;
+    return esc(alt);
+  });
+  t = t.replace(/\[\[([^\]]+)\]\]/g, (m, name) => {
+    const a = anchors[name];
+    if(a) return `<a class="blink" href="#${a}">${name}</a>`;
+    return `<span class="bmiss">[[${name}]]</span>`;
+  });
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  t = t.replace(/(^|[^*])\*([^\n]+)\*/g, "$1<em>$2</em>");
+  t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  return t;
+}
+function blocksToBookHtml(blocks, anchors){
+  return blocks.map(b => {
+    if(b.type === "heading") return "<h" + b.level + ">" + inlineBook(b.text, anchors) + "</h" + b.level + ">";
+    if(b.type === "code") return "<pre><code>" + esc(b.text) + "</code></pre>";
+    if(b.type === "hr") return "<hr>";
+    if(b.type === "quote") return "<blockquote>" + inlineBook(b.text, anchors).replace(/\n/g, "<br>") + "</blockquote>";
+    if(b.type === "list") return "<ul>" + b.items.map(it => {
+      const cb = it.match(/^\[([ xX])\]\s+(.*)$/);
+      if(cb) return "<li>" + (cb[1].toLowerCase() === "x" ? "☑ " : "☐ ") + inlineBook(cb[2], anchors) + "</li>";
+      return "<li>" + inlineBook(it, anchors) + "</li>";
+    }).join("") + "</ul>";
+    return "<p>" + inlineBook(b.text, anchors).replace(/\n/g, "<br>") + "</p>";
+  }).join("");
+}
+function buildMiniBook(){
+  const cs = cmpState;
+  const list = cmpOrderedNotes();
+  const title = (cs.title || "").trim() || t("cmp_default_title");
+  const anchors = {};
+  list.forEach((n, i) => { if(!(n.fm.title in anchors)) anchors[n.fm.title] = "n" + (i + 1); });
+  const toc = list.map((n, i) => `<li><a href="#n${i + 1}">${esc(n.fm.title)}</a></li>`).join("");
+  const secs = list.map((n, i) => {
+    const meta = [];
+    if(n.fm.tags && n.fm.tags.length) meta.push((LANG === "en" ? "Tags: " : "タグ：") + n.fm.tags.join(", "));
+    meta.push((LANG === "en" ? "Updated: " : "更新：") + fmtDate(n.fm.updated).slice(0, 10));
+    return `<section id="n${i + 1}"><h2>${esc(n.fm.title)}</h2><p class="bmeta">${esc(meta.join(" ／ "))}</p>`
+      + blocksToBookHtml(parseBlocks(n.body), anchors) + "</section>";
+  }).join("\n");
+  const today = fmtDate(new Date().toISOString()).slice(0, 10);
+  const countLine = LANG === "en" ? list.length + " notes" : list.length + "件のノート";
+  const text = "<!DOCTYPE html>\n<html lang=\"" + (LANG === "ja" ? "ja" : "en") + "\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<title>"
+    + esc(title) + "</title>\n<style>" + BOOK_CSS + "</style>\n</head>\n<body>\n<header class=\"cover\"><h1>" + esc(title)
+    + "</h1><div class=\"cmeta\">" + today + " ・ " + countLine
+    + "</div></header>\n<div class=\"wrap\">\n<nav class=\"toc\"><h2>" + t("book_toc") + "</h2><ol>" + toc
+    + "</ol></nav>\n" + secs + "\n</div>\n<footer>" + t("book_footer") + "</footer>\n</body>\n</html>";
+  return { title, text, count: list.length };
 }
 /* ============ ノートの印刷（第9期） ============ */
 function printNote(id){
@@ -1602,6 +1684,33 @@ function mapPosFor(n, i, total){
   const ang = (Math.PI * 2 * i) / Math.max(1, total) - Math.PI / 2;
   return { x: Math.round(cx + r * Math.cos(ang) - 50), y: Math.round(cy + r * Math.sin(ang) - 22) };
 }
+function corrMonthLabel(ym){
+  const y = ym.slice(0, 4), m = parseInt(ym.slice(5, 7), 10);
+  if(LANG === "ja") return y + "年" + m + "月";
+  const names = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  return names[m - 1] + " " + y;
+}
+function openCorridorNote(id){ currentId = id; view = "doc"; edMode = "edit"; render(); }
+function corridorViewHtml(){
+  const list = [...notes].sort((a, b) =>
+    (b.fm.created || "").localeCompare(a.fm.created || "") || (b.fm.updated || "").localeCompare(a.fm.updated || ""));
+  let html = `<div class="card"><h3 style="margin-top:0">${t("nav_corridor")}</h3><p class="small" style="margin-bottom:0">${t("corr_lead")}</p></div><div class="corrwrap">`;
+  let lastMonth = "";
+  for(const n of list){
+    const ym = (n.fm.created || "").slice(0, 7);
+    if(ym && ym !== lastMonth){ html += `<div><span class="corrmonth">${corrMonthLabel(ym)}</span></div>`; lastMonth = ym; }
+    const upd = n.fm.updated && n.fm.updated.slice(0, 10) !== (n.fm.created || "").slice(0, 10)
+      ? " ／ " + t("prt_updated") + fmtDate(n.fm.updated).slice(0, 10) : "";
+    const tags = n.fm.tags.length ? `<div style="margin-top:5px">${n.fm.tags.map(x => `<span class="tag">${esc(x)}</span>`).join(" ")}</div>` : "";
+    html += `<div class="corrcard" onclick="openCorridorNote('${n.id}')">
+      <div class="ct">${esc(n.fm.title)}</div>
+      <div class="cm">${t("prt_created")}${fmtDate(n.fm.created).slice(0, 10)}${upd}</div>
+      ${tags}
+      <div class="cx">${esc(excerptOf(parseBlocks(n.body), 110))}</div>
+    </div>`;
+  }
+  return html + "</div>";
+}
 function mapViewHtml(){
   const list = sortedNotes();
   const edges = mapEdges();
@@ -1834,8 +1943,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
