@@ -118,6 +118,9 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 /* モーダル */
 .overlay{ position:fixed; inset:0; background:rgba(30,35,30,.45); z-index:80; display:flex; align-items:flex-end; justify-content:center; }
 .sheet{ background:var(--card); width:100%; max-width:640px; max-height:88vh; overflow:auto; border-radius:18px 18px 0 0; padding:18px; }
+.sheetfoot{ position:sticky; bottom:-18px; margin:14px -18px -18px; padding:10px 18px 18px; background:var(--card); border-top:1px solid var(--line); box-shadow:0 -8px 14px rgba(38,49,46,.08); }
+.sheetfoot .btnrow:first-of-type{ margin-top:0; }
+.scrollhint{ text-align:center; font-size:12px; color:var(--muted); padding:2px 0 6px; }
 .sheet h2{ margin-top:0; }
 footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px 4px; }
 @media (max-width:760px){
@@ -708,6 +711,22 @@ function openExportAll(){
 }
 function openModal(html){
   $("#modalRoot").innerHTML = `<div class="overlay" onclick="if(event.target === this) closeModal()"><div class="sheet">${html}</div></div>`;
+  const sheet = document.querySelector("#modalRoot .sheet");
+  const foot = sheet ? sheet.querySelector(".sheetfoot") : null;
+  if(sheet && foot){
+    const hint = document.createElement("div");
+    hint.className = "scrollhint";
+    hint.textContent = "▼ 下に続きがあります";
+    hint.style.display = "none";
+    foot.insertBefore(hint, foot.firstChild);
+    const update = () => {
+      const more = sheet.scrollHeight - sheet.clientHeight - sheet.scrollTop > 8;
+      hint.style.display = more ? "" : "none";
+    };
+    sheet.addEventListener("scroll", update, { passive: true });
+    requestAnimationFrame(update);
+    setTimeout(update, 350);
+  }
 }
 function closeModal(){ $("#modalRoot").innerHTML = ""; }
 function openImport(){
@@ -719,6 +738,8 @@ function openImport(){
   <textarea id="impText" rows="7" placeholder="# 見出し&#10;&#10;本文…"></textarea>
   <label class="flabel">貼り付け分のタイトル（見出しがない場合）</label>
   <input type="text" id="impTitle" placeholder="貼り付けノート">
+  <div class="sheetfoot">
+  <div id="impMsg"></div>
   <div class="btnrow">
     <button class="btn" onclick="importPaste()">貼り付けを取り込む</button>
     <button class="btn ghost" onclick="closeModal()">閉じる</button>
@@ -726,7 +747,7 @@ function openImport(){
   <div class="btnrow">
     <button class="btn sub" onclick="openAiImport()">🤖 AIが編集した.mdはこちら（差分確認つき）</button>
   </div>
-  <div id="impMsg"></div>`);
+  </div>`);
 }
 function parseBulkText(text){
   const parts = String(text).split(BULK_SEP).map(s => s.trim()).filter(Boolean);
@@ -1264,8 +1285,10 @@ function openAiImport(){
   <input type="file" id="aiImpFiles" accept=".md,.markdown,.txt" onchange="aiImportFiles(this)">
   <label class="flabel">貼り付けで取り込む（.mdの中身）</label>
   <textarea id="aiImpText" rows="6" placeholder="編集済みのMarkdownをここに貼り付け"></textarea>
+  <div class="sheetfoot">
   <div class="btnrow"><button class="btn" onclick="aiImportPaste()">差分をプレビュー</button></div>
-  <div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
+  <div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>
+  </div>`);
 }
 async function aiImportFiles(input){
   const files = Array.from(input.files || []);
@@ -1313,10 +1336,12 @@ function renderImportProposal(){
   openModal(`<h2>差分の確認（${esc(ip.sourceLabel)}から）</h2>
   <p class="small">取り込む項目にチェックを入れてください。実行の直前に、控え（スナップショット）を残します。</p>
   ${itemsHtml}
+  <div class="sheetfoot">
   <div id="impPropMsg"></div>
   <div class="btnrow">
     ${ip.items.length ? `<button class="btn" onclick="applyImportProposal()">✓ 承認した項目を取り込む</button>` : ""}
     <button class="btn ghost" onclick="closeModal()">閉じる</button>
+  </div>
   </div>`);
 }
 function toggleImportItem(i){
@@ -1356,7 +1381,7 @@ async function applyImportProposal(){
   view = "doc";
   openModal(`<h2>取り込みました</h2>
   <p class="small">更新 ${upd} 件・新規 ${cre} 件を取り込みました。実行前の控えを残してあるので、AI画面の「スナップショットとロールバック」から元に戻せます。</p>
-  <div class="btnrow"><button class="btn" onclick="closeModal(); render();">閉じる</button></div>`);
+  <div class="sheetfoot"><div class="btnrow"><button class="btn" onclick="closeModal(); render();">閉じる</button></div></div>`);
   render();
 }
 /* ============ フォルダ連携（File System Access・対応環境のみ） ============ */
@@ -1505,6 +1530,9 @@ function openPad(target){
   <canvas id="inkCanvas"></canvas>
   <p class="small">指やペンで書けます。保存すると、画像としてノートに入ります（AIキーなしでも使えます）。</p>
   <div id="inkMsg"></div>
+  ${aiReady() ? "" : `<p class="small">AIキーがあると、手書きの文字起こしもできます（設定で有効化）。</p>`}
+  <div id="ocrArea"></div>
+  <div class="sheetfoot">
   <div class="btnrow">
     ${target === "new"
       ? `<button class="btn" onclick="inkSaveNew()">📄 新しいノートとして保存</button>`
@@ -1513,9 +1541,8 @@ function openPad(target){
       ? `<button class="btn sub" onclick="inkOcr()">🤖 AIで文字起こし</button>`
       : ``}
   </div>
-  ${aiReady() ? "" : `<p class="small">AIキーがあると、手書きの文字起こしもできます（設定で有効化）。</p>`}
-  <div id="ocrArea"></div>
-  <div class="btnrow"><button class="btn ghost" onclick="closeInk()">閉じる</button></div>`);
+  <div class="btnrow"><button class="btn ghost" onclick="closeInk()">閉じる</button></div>
+  </div>`);
   initInkCanvas();
 }
 function inkMsg(t){
@@ -1659,7 +1686,9 @@ function showOcrDraft(text){
     <label class="checkrow" style="margin-top:10px;"><input type="checkbox" id="ocrKeepImg" checked><span>元の手書き画像もノートの末尾に付ける</span></label>
     <div class="btnrow"><button class="btn" onclick="saveOcrDraft()">✓ この内容でノートを作る</button></div>
   </div>`;
-  area.scrollIntoView({ behavior: "smooth", block: "start" });
+  const sheetEl = document.querySelector("#modalRoot .sheet");
+  if(sheetEl) setTimeout(() => { sheetEl.scrollTop = sheetEl.scrollHeight; }, 60);
+  else area.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 async function saveOcrDraft(){
   const titleEl = document.getElementById("ocrTitle");
@@ -1690,6 +1719,7 @@ function openVoice(){
   <label class="flabel">メモの内容（いつでも編集できます）</label>
   <textarea id="voiceText" rows="7" placeholder="ここに話した内容が入ります。直接打っても構いません。"></textarea>
   <div id="voiceMsg"></div>
+  <div class="sheetfoot">
   <div class="btnrow">
     <button class="btn" onclick="voiceSave()">📄 この内容でノートを作る</button>
     ${aiReady() ? `<button class="btn sub" onclick="voiceStructure()">🤖 AIでMarkdownに整える</button>` : ""}
@@ -1697,6 +1727,7 @@ function openVoice(){
   <div class="btnrow">
     <button class="btn ghost" id="voiceUndoBtn" style="display:none;" onclick="voiceUndoStructure()">↩ 整える前の文に戻す</button>
     <button class="btn ghost" onclick="closeVoice()">閉じる</button>
+  </div>
   </div>`);
 }
 function voiceMsg(t){
