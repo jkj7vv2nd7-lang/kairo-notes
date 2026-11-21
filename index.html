@@ -1014,7 +1014,7 @@ function mapEdges(){
 function mapPosFor(n, i, total){
   if(mapPos[n.id]) return mapPos[n.id];
   const cx = 850, cy = 600;
-  const r = Math.max(300, Math.min(540, 200 + total * 24));
+  const r = Math.max(150, Math.min(260, 100 + total * 13));
   const ang = (Math.PI * 2 * i) / Math.max(1, total) - Math.PI / 2;
   return { x: Math.round(cx + r * Math.cos(ang) - 50), y: Math.round(cy + r * Math.sin(ang) - 22) };
 }
@@ -1053,7 +1053,25 @@ function drawMapEdges(){
     return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#8f83c4" stroke-width="2" stroke-opacity="0.75"/>`;
   }).join("");
 }
-function afterMapRender(){ drawMapEdges(); }
+function afterMapRender(){
+  drawMapEdges();
+  const wrap = document.querySelector(".mapwrap");
+  const board = document.getElementById("mapBoard");
+  if(!wrap || !board) return;
+  const nodes = [...board.querySelectorAll(".mnode")];
+  if(!nodes.length) return;
+  const xs = nodes.map(el => el.offsetLeft + el.offsetWidth / 2);
+  const ys = nodes.map(el => el.offsetTop + el.offsetHeight / 2);
+  const trimmedCenter = a => {
+    const s = [...a].sort((p, q) => p - q);
+    const k = Math.floor(s.length * 0.2);
+    const t = s.slice(k, s.length - k);
+    return (t[0] + t[t.length - 1]) / 2;
+  };
+  const cx = trimmedCenter(xs), cy = trimmedCenter(ys);
+  wrap.scrollLeft = Math.max(0, Math.round(cx - wrap.clientWidth / 2));
+  wrap.scrollTop = Math.max(0, Math.round(cy - wrap.clientHeight / 2));
+}
 async function resetMapLayout(){
   mapPos = {};
   await metaSet("mapPos", mapPos);
