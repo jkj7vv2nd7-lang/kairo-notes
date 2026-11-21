@@ -270,7 +270,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.11.0";
+const APP_VER = "1.12.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -394,6 +394,17 @@ const STR = {
   cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
   cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
   book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  spk_btn: ["🔊 読み上げ", "🔊 Read aloud"], spk_stop: ["⏹ 止める", "⏹ Stop"],
+  con_title: ["📚 複数ノートでAI相談", "📚 Ask the AI about several notes"],
+  con_lead: ["ノートを複数選んで、AIにまとめや問いかけの下書きを作らせることができます。結果は、新しいノートとして保存したときだけ残ります。元のノートは変わりません。", "Pick several notes and let the AI draft a combined summary or questions. It is kept only when you save it as a new note. The original notes never change."],
+  con_open: ["相談をはじめる", "Start"],
+  con_mode_summary: ["まとめ要約", "Combined summary"], con_mode_questions: ["問いかけ", "Questions"],
+  con_selected: ["{n} 件のノートを選択中", "{n} notes selected"],
+  con_draft_label: ["AIの下書き（直せます）", "AI draft (editable)"],
+  con_save: ["新しいノートとして保存", "Save as a new note"], con_run: ["下書きを作る", "Draft it"],
+  con_empty_sel: ["ノートを1つ以上選んでください。", "Please select at least one note."],
+  con_empty_result: ["うまく作れませんでした。もう一度お試しください。", "Could not draft it. Please try again."],
+  con_title_summary: ["AIまとめ", "AI summary"], con_title_questions: ["AIの問いかけ", "AI questions"],
   tb_table: ["表", "Table"],
   tbl_title: ["▦ 表を入れる", "▦ Insert a table"], tbl_lead: ["マスをタップして、表の大きさを選んでください。", "Tap the grid to choose the size of the table."],
   tbl_insert: ["この表を入れる", "Insert this table"],
@@ -871,6 +882,7 @@ if(window.matchMedia){
   if(mq7.addEventListener) mq7.addEventListener("change", () => renderTopNav());
 }
 function render(){
+  if(ttsOn && (view !== "doc" || currentId !== ttsNoteId)) stopSpeak();
   renderBottom();
   renderTopNav();
   const app = $("#app");
@@ -1103,6 +1115,7 @@ function editorHtml(n){
       <button class="btn sub" onclick="printNote('${n.id}')">${t("prt_btn")}</button>
       <button class="btn sub" onclick="toggleTemplate('${n.id}')">${templateOf(n.id) ? t("tpl_off") : t("tpl_on")}</button>
       ${aiReady() ? `<button class="btn sub" onclick="openSummary()">${t("sum_btn")}</button>` : ""}
+      <button class="btn sub" id="speakBtn" onclick="toggleSpeak('${n.id}')">${ttsOn && ttsNoteId === n.id ? t("spk_stop") : t("spk_btn")}</button>
     </div>
   </div>
   <div class="card outline">
@@ -1990,8 +2003,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -2288,6 +2301,11 @@ function aiViewHtml(){
       <div class="btnrow"><button class="btn" id="aiRunBtn" ${aiBusy ? "disabled" : ""} onclick="runLibrarian()">${aiBusy ? t("ai_thinking") : t("ai_run")}</button></div>
       <div id="aiMsg">${aiNote ? `<div class="msg">${esc(aiNote)}</div>` : ""}</div>
       <p class="small">${t("ai_draft_note")}</p>
+    </div>`;
+    if(aiReady()) h += `<div class="card">
+      <h2>${t("con_title")}</h2>
+      <p class="small">${t("con_lead")}</p>
+      <div class="btnrow"><button class="btn" onclick="openConsult()">${t("con_open")}</button></div>
     </div>`;
     if(proposal) h += proposalHtml();
   }
@@ -2828,6 +2846,77 @@ function sumApplyTitle(i){
   s.msg = t("sum_title_done");
   renderSummaryModal(); renderEditor(); renderNoteList();
 }
+/* ============ 読み上げ（第13期） ============ */
+let ttsOn = false, ttsNoteId = null, ttsToken = 0;
+function ttsTextOf(n){
+  let b = n.body || "";
+  b = b.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  b = b.replace(/\[\[([^\]]+)\]\]/g, "$1");
+  b = b.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  b = b.replace(/^\s{0,3}#{1,6}\s*/gm, "");
+  b = b.replace(/^\s*>\s?/gm, "");
+  b = b.replace(/^\s*(?:[-*+]|\d+\.)\s+/gm, "");
+  b = b.replace(/`{1,3}/g, "");
+  b = b.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/_([^_]+)_/g, "$1");
+  b = b.replace(/^\s*-{3,}\s*$/gm, "");
+  b = b.replace(/\|/g, " ");
+  return (n.fm.title + "。\n" + b).replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+function ttsLangOf(text){
+  if(/[ぁ-んァ-ヶ一-龠]/.test(text)) return "ja-JP";
+  if(/[A-Za-z]/.test(text)) return "en-US";
+  return LANG === "ja" ? "ja-JP" : "en-US";
+}
+function ttsChunks(text){
+  const parts = text.split(/(?<=[。．.!?！？\n])/);
+  const out = [];
+  let cur = "";
+  for(const p of parts){
+    if((cur + p).length > 180 && cur){ out.push(cur); cur = ""; }
+    cur += p;
+  }
+  if(cur.trim()) out.push(cur);
+  return out.filter(x => x.trim());
+}
+function toggleSpeak(id){
+  if(ttsOn){ stopSpeak(); return; }
+  const n = getNote(id); if(!n) return;
+  if(!("speechSynthesis" in window)) return;
+  const text = ttsTextOf(n);
+  if(!text) return;
+  const lang = ttsLangOf(text);
+  const chunks = ttsChunks(text);
+  ttsOn = true; ttsNoteId = id;
+  const my = ++ttsToken;
+  refreshSpeakBtn();
+  let i = 0;
+  const next = () => {
+    if(my !== ttsToken) return;
+    if(i >= chunks.length){ ttsOn = false; ttsNoteId = null; refreshSpeakBtn(); return; }
+    const u = new SpeechSynthesisUtterance(chunks[i++]);
+    u.lang = lang;
+    try{
+      const vs = speechSynthesis.getVoices ? speechSynthesis.getVoices() : [];
+      const v = vs.find(x => x.lang && x.lang.toLowerCase().startsWith(lang.slice(0, 2)));
+      if(v) u.voice = v;
+    }catch(e){ }
+    u.onend = next;
+    u.onerror = next;
+    speechSynthesis.speak(u);
+  };
+  try{ speechSynthesis.cancel(); }catch(e){ }
+  next();
+}
+function stopSpeak(){
+  ttsToken++;
+  if(ttsOn){ try{ speechSynthesis.cancel(); }catch(e){ } }
+  ttsOn = false; ttsNoteId = null;
+  refreshSpeakBtn();
+}
+function refreshSpeakBtn(){
+  const b = document.getElementById("speakBtn");
+  if(b) b.textContent = (ttsOn && ttsNoteId === currentId) ? t("spk_stop") : t("spk_btn");
+}
 /* ============ バックアップと復元（第12期） ============ */
 let safetyBackupAt = null;
 async function idbClear(store){
@@ -3112,6 +3201,93 @@ function tblInsert(){
   const ta2 = document.getElementById("edBody");
   if(ta2){ ta2.focus(); const pos = (before + pre + table).length; try{ ta2.setSelectionRange(pos, pos); }catch(_){ } }
 }
+/* ============ 複数ノートを選ぶAI相談（第13期） ============ */
+let conState = null;
+function openConsult(){
+  conState = { sel: new Set(), mode: "summary", draft: "", busy: false, msg: "" };
+  renderConsultModal();
+}
+function conSyncChecks(){
+  document.querySelectorAll("#modalRoot input[data-nid]").forEach(cb => { cb.checked = conState.sel.has(cb.dataset.nid); });
+  const c = document.getElementById("conCount");
+  if(c) c.textContent = t("con_selected").replace("{n}", conState.sel.size);
+}
+function conToggle(id){
+  if(!conState) return;
+  if(conState.sel.has(id)) conState.sel.delete(id); else conState.sel.add(id);
+  conSyncChecks();
+}
+function conPickTag(i){
+  if(!conState) return;
+  const tg = allTags()[i];
+  sortedNotes().filter(n => n.fm.tags.includes(tg)).forEach(n => conState.sel.add(n.id));
+  conSyncChecks();
+}
+function conSetMode(m){ if(conState){ conState.mode = m; renderConsultModal(); } }
+function renderConsultModal(){
+  const s = conState; if(!s) return;
+  const tags = allTags();
+  openModal(`<h2>${t("con_title")}</h2>
+  <p class="small">${t("con_lead")}</p>
+  <div class="seg2">
+    <button class="${s.mode === "summary" ? "on" : ""}" onclick="conSetMode('summary')">${t("con_mode_summary")}</button>
+    <button class="${s.mode === "questions" ? "on" : ""}" onclick="conSetMode('questions')">${t("con_mode_questions")}</button>
+  </div>
+  ${tags.length ? `<div style="margin:10px 0 2px;">${tags.map((tg, i) => `<span class="chip" onclick="conPickTag(${i})">${esc(tg)}</span>`).join("")}</div>` : ""}
+  <div style="max-height:36vh; overflow:auto; margin:6px 0;">
+  ${sortedNotes().map(n => `<label class="targetitem"><input type="checkbox" data-nid="${n.id}" ${s.sel.has(n.id) ? "checked" : ""} onchange="conToggle('${n.id}')"><span><strong>${esc(n.fm.title)}</strong> <span class="small">${n.fm.tags.map(esc).join("、")}</span></span></label>`).join("")}
+  </div>
+  <p class="small" id="conCount">${t("con_selected").replace("{n}", s.sel.size)}</p>
+  ${s.draft ? `<label class="flabel">${t("con_draft_label")}</label>
+    <textarea class="ed" id="conDraft" style="min-height:130px">${esc(s.draft)}</textarea>
+    <div class="btnrow"><button class="btn" onclick="conSave()">${t("con_save")}</button></div>` : ""}
+  ${s.msg ? `<div class="msg">${esc(s.msg)}</div>` : ""}
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="conRun()" ${s.busy ? "disabled" : ""}>${t("con_run")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function conRun(){
+  const s = conState; if(!s || s.busy) return;
+  if(!s.sel.size){ s.msg = t("con_empty_sel"); renderConsultModal(); return; }
+  const picked = sortedNotes().filter(n => s.sel.has(n.id));
+  s.busy = true; s.msg = ""; renderConsultModal();
+  const joined = picked.map(n => "## " + n.fm.title + "\n\n" + n.body).join("\n\n---\n\n").slice(0, 6000);
+  const prompt = s.mode === "summary"
+    ? "Read the following notes and write a combined summary in the same language as the notes. Organize it with short headings and bullet points where helpful. Output only the summary in Markdown.\n\n" + joined
+    : "Read the following notes and pose 3 to 5 questions that connect them and help the writer think further, in the same language as the notes. Output one question per line, without numbering.\n\n" + joined;
+  const w = startAiWait();
+  try{
+    s.draft = (await aiAsk(prompt)).trim();
+    if(!s.draft) s.msg = t("con_empty_result");
+  }catch(err){
+    stopAiWait();
+    s.busy = false;
+    s.msg = aiWaitCancelled(w) ? t("wait_stopped") : aiErrText(err);
+    if(conState === s) renderConsultModal();
+    return;
+  }
+  stopAiWait();
+  s.busy = false;
+  if(conState === s) renderConsultModal();
+}
+async function conSave(){
+  const s = conState; if(!s) return;
+  const ta = document.getElementById("conDraft");
+  const draft = (ta ? ta.value : s.draft).trim();
+  if(!draft) return;
+  const picked = sortedNotes().filter(n => s.sel.has(n.id));
+  if(!picked.length) return;
+  const head = s.mode === "summary" ? t("con_title_summary") : t("con_title_questions");
+  const title = head + "：" + picked[0].fm.title + (picked.length > 1 ? (LANG === "ja" ? " ほか" + (picked.length - 1) + "件" : " +" + (picked.length - 1)) : "");
+  const srcHead = LANG === "ja" ? "## もとのノート" : "## Source notes";
+  const body = draft + "\n\n" + srcHead + "\n\n" + picked.map(n => "- [[" + n.fm.title + "]]").join("\n") + "\n";
+  const n = await createNote(title, body, ["AI"], "idea");
+  conState = null;
+  closeModal();
+  view = "doc";
+  openNote(n.id);
+}
 function openCreateMenu(){
   openModal(`<h2>${t("create_title")}</h2>
   <div class="btnrow" style="flex-direction:column;">
@@ -3171,18 +3347,21 @@ async function aiAskImage(prompt, dataUrl){
 /* ============ 手書きメモ（ベクターで保持し、画像として保存） ============ */
 let ink = null;
 function openPad(target){
-  ink = { target, strokes: [], cur: null, color: "#26312e", width: 3.2, eraser: false, erasing: false };
+  ink = { target, strokes: [], cur: null, color: "#26312e", width: 3.2, eraser: false, erasing: false, marker: false };
   openModal(`<h2>✍️ 手書きメモ</h2>
   <div class="inktools">
-    <button id="inkPen" class="on" onclick="inkSetTool(false)">✏️ ペン</button>
-    <button id="inkEra" onclick="inkSetTool(true)">🧽 消しゴム</button>
+    <button id="inkPen" class="on" onclick="inkSetTool('pen')">✏️ ペン</button>
+    <button id="inkMark" onclick="inkSetTool('marker')">🖍 マーカー</button>
+    <button id="inkEra" onclick="inkSetTool('eraser')">🧽 消しゴム</button>
     <button onclick="inkUndo()">↩ 1画もどる</button>
     <button onclick="inkClear()">🗑 全部消す</button>
   </div>
   <div class="inktools">
     <button class="inkc on" onclick="inkSetColor(this, '#26312e')">● 黒</button>
-    <button class="inkc" onclick="inkSetColor(this, '#2456a6')">● 青</button>
+    <button class="inkc" onclick="inkSetColor(this, '#3d348b')">● 藍紫</button>
     <button class="inkc" onclick="inkSetColor(this, '#b03a2e')">● 赤</button>
+    <button class="inkc" onclick="inkSetColor(this, '#2456a6')">● 青</button>
+    <button class="inkc" onclick="inkSetColor(this, '#1d9e6c')">● 緑</button>
   </div>
   <canvas id="inkCanvas"></canvas>
   <p class="small">指やペンで書けます。保存すると、画像としてノートに入ります（AIキーなしでも使えます）。</p>
@@ -3232,7 +3411,8 @@ function inkDown(e){
   try{ cv.setPointerCapture(e.pointerId); }catch(err){}
   const p = inkPos(e);
   if(ink.eraser){ ink.erasing = true; inkEraseAt(p); return; }
-  ink.cur = { c: ink.color, w: ink.width, pts: [p] };
+  ink.cur = { c: ink.color, w: ink.marker ? 16 : ink.width, pts: [p] };
+  if(ink.marker) ink.cur.a = 0.35;
   ink.strokes.push(ink.cur);
   inkRedraw();
 }
@@ -3268,6 +3448,7 @@ function inkRedraw(){
   ctx.fillRect(0, 0, cv.width, cv.height);
   ctx.lineCap = "round"; ctx.lineJoin = "round";
   for(const s of ink.strokes){
+    ctx.globalAlpha = typeof s.a === "number" ? s.a : 1;
     ctx.strokeStyle = s.c;
     ctx.lineWidth = s.w * dpr;
     ctx.beginPath();
@@ -3275,13 +3456,16 @@ function inkRedraw(){
     if(s.pts.length === 1) ctx.lineTo(s.pts[0].x + 0.1, s.pts[0].y + 0.1);
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
 }
-function inkSetTool(eraser){
+function inkSetTool(mode){
   if(!ink) return;
-  ink.eraser = eraser;
-  const p = document.getElementById("inkPen"), e = document.getElementById("inkEra");
-  if(p) p.classList.toggle("on", !eraser);
-  if(e) e.classList.toggle("on", eraser);
+  ink.eraser = mode === "eraser";
+  ink.marker = mode === "marker";
+  const p = document.getElementById("inkPen"), m = document.getElementById("inkMark"), e = document.getElementById("inkEra");
+  if(p) p.classList.toggle("on", mode === "pen");
+  if(m) m.classList.toggle("on", mode === "marker");
+  if(e) e.classList.toggle("on", mode === "eraser");
 }
 function inkSetColor(btn, color){
   if(!ink) return;
