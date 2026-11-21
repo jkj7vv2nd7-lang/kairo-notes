@@ -73,6 +73,8 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 .preview pre code{ background:none; color:inherit; padding:0; }
 .preview blockquote{ border-left:4px solid var(--teal); margin:10px 0; padding:4px 12px; color:var(--muted); background:#f4f7f5; }
 .preview a{ color:var(--teal-dark); }
+.preview a.wikilink{ color:var(--teal-dark); font-weight:700; text-decoration:underline; text-underline-offset:2px; }
+.wikimiss{ color:var(--muted); }
 .preview img{ max-width:100%; height:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
 /* 手書きパッド・音声メモ */
 .inktools{ display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
@@ -147,7 +149,7 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 <div id="modalRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.1.0";
+const APP_VER = "1.2.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -204,6 +206,11 @@ function parseBlocks(body){
   }
   return blocks;
 }
+function wikiTitleMap(){
+  const map = {};
+  notes.forEach(n => { map[esc(n.fm.title)] = n.id; });
+  return map;
+}
 function inlineMd(s){
   let t = esc(s);
   t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => {
@@ -213,6 +220,11 @@ function inlineMd(s){
     }
     if(/^(https:|data:image\/)/.test(src)) return `<img src="${src}" alt="${alt}" loading="lazy">`;
     return esc(alt);
+  });
+  t = t.replace(/\[\[([^\]]+)\]\]/g, (m, name) => {
+    const id = wikiTitleMap()[name];
+    if(id) return `<a href="#" class="wikilink" onclick="openNote('${id}'); return false;">${name}</a>`;
+    return `<span class="wikimiss">[[${name}]]</span>`;
   });
   t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
   t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
@@ -478,6 +490,29 @@ function emptyEditorHtml(){
     <button class="btn" onclick="newNote()">＋ 新しいノートを作る</button>
   </div>`;
 }
+function backlinksOf(n){
+  const title = n.fm.title;
+  if(!title || title.length < 2) return [];
+  const out = [];
+  for(const m of notes){
+    if(m.id === n.id) continue;
+    if(m.body.includes("[[" + title + "]]")) out.push({ note: m, kind: "リンク" });
+    else if(m.body.includes(title)) out.push({ note: m, kind: "言及" });
+  }
+  return out;
+}
+function backlinksHtml(n){
+  const bs = backlinksOf(n);
+  if(!bs.length) return "";
+  return `<div class="card">
+    <h2>🔗 このノートへのリンク</h2>
+    ${bs.map(b => `<div class="relrow">
+      <div class="relmain"><b>${esc(b.note.fm.title)}</b> <span class="tag">${b.kind}</span></div>
+      <button class="mini" onclick="openNote('${b.note.id}')">開く</button>
+    </div>`).join("")}
+    <p class="small">本文に [[${esc(n.fm.title)}]] と書くと、プレビューでリンクになります。</p>
+  </div>`;
+}
 function editorHtml(n){
   const blocks = parseBlocks(n.body);
   const ol = outlineOf(blocks);
@@ -513,6 +548,7 @@ function editorHtml(n){
     <h2>🧭 見出しアウトライン</h2>
     ${ol.length ? ol.map((h, i) => `<button class="lv${Math.min(h.level, 4)}" onclick="jumpHeading(${i})">${esc(h.text)}</button>`).join("") : `<p class="small">見出し（# ）を書くと、ここに並びます。</p>`}
   </div>
+  ${backlinksHtml(n)}
   <div class="card" id="relCard">${relatedHtml(n)}</div>`;
 }
 function renderEditor(){
@@ -687,7 +723,20 @@ function openImport(){
     <button class="btn" onclick="importPaste()">貼り付けを取り込む</button>
     <button class="btn ghost" onclick="closeModal()">閉じる</button>
   </div>
+  <div class="btnrow">
+    <button class="btn sub" onclick="openAiImport()">🤖 AIが編集した.mdはこちら（差分確認つき）</button>
+  </div>
   <div id="impMsg"></div>`);
+}
+function parseBulkText(text){
+  const parts = String(text).split(BULK_SEP).map(s => s.trim()).filter(Boolean);
+  const out = [];
+  for(const part of parts){
+    const cleaned = part.replace(/^<!--[\s\S]*?-->\s*/, "");
+    const p = parseNote("tmp", cleaned);
+    out.push({ fm: p.fm, body: p.body });
+  }
+  return out;
 }
 async function importText(text, fallbackTitle){
   const parts = String(text).split(BULK_SEP).map(s => s.trim()).filter(Boolean);
@@ -936,6 +985,16 @@ function aiSettingsCardHtml(){
 function settingsViewHtml(){
   return `<h2 style="margin:4px 0 12px;">⚙ 設定</h2>
   ${aiSettingsCardHtml()}
+  ${FS_OK ? `<div class="card">
+    <h2>📁 フォルダ連携（PC Chrome）</h2>
+    <p class="small">選んだフォルダの.mdファイルを直接読み書きします。フォルダの指定は、このタブを開いている間だけ有効です。読み込みは差分を確認してから取り込む形で、無断で上書きしません。</p>
+    <div class="btnrow">
+      <button class="btn sub" onclick="fsPickDir()">📁 フォルダを選ぶ</button>
+      <button class="btn sub" onclick="fsImport()">⬆ フォルダから読み込む</button>
+      <button class="btn" onclick="fsExport()">⬇ フォルダへ書き出す</button>
+    </div>
+    <div id="fsMsg"></div>
+  </div>` : ""}
   <div class="card">
     <h2>📦 データについて</h2>
     <p class="small">ノートは ${notes.length} 件、この端末のIndexedDBに保存されています。本文はフロントマター付きの素のMarkdownです。「文書」画面の「⬇ 全て書き出し」で、いつでも持ち出せます。</p>
@@ -944,7 +1003,7 @@ function settingsViewHtml(){
   </div>
   <div class="card">
     <h2>ℹ️ このアプリについて</h2>
-    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第2期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。</p>
+    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第3期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、外部AIとの受け渡しも差分確認つきです。</p>
   </div>`;
 }
 /* ============ AI Librarian（差分プレビュー→承認→実行／ロールバック） ============ */
@@ -985,6 +1044,15 @@ function aiViewHtml(){
     </div>`;
     if(proposal) h += proposalHtml();
   }
+  h += `<div class="card">
+    <h2>📤 外部AIへの受け渡し</h2>
+    <p class="small">上のチェックで選んだノートを、1つの.mdにまとめて書き出せます。外部のAI（ChatGPTやClaudeなど）に編集してもらうための形式です。編集後の.mdは、差分を確認してから取り込めます（無断で上書きしません）。</p>
+    <div class="btnrow">
+      <button class="btn sub" onclick="exportHandoff()">⬇ 選んだノートをまとめて書き出す</button>
+      <button class="btn sub" onclick="openAiImport()">⬆ 編集済みの.mdを取り込む</button>
+    </div>
+    <div id="handoffMsg"></div>
+  </div>`;
   h += `<div class="card">
     <h2>↩️ スナップショットとロールバック</h2>
     <p class="small">AI整理を実行する直前の状態の控えです。ロールバックすると、その時点のノート一式に戻ります（最大5件）。</p>
@@ -1174,6 +1242,163 @@ async function executeProposal(){
   proposal = null;
   aiNote = chosen.length + "件の整理を実行しました。元に戻したいときは、下のスナップショットからロールバックできます。";
   render();
+}
+/* ============ 外部AIへの受け渡し（書き出し／差分つき取り込み） ============ */
+const HANDOFF_HEADER = "<!-- Kairo ノートから書き出したノート集です。各ノートは「<!-- ===== Kairo note ===== -->」の区切りで分かれ、先頭にフロントマター（title/tags/status/created/updated）があります。編集するときは、区切りとフロントマターの形を保ってください。Kairoに取り込むと、titleが一致するノートは差分確認のうえで更新され、一致しないノートは新規として追加されます。 -->";
+function exportHandoff(){
+  const targets = sortedNotes().filter(n => aiTargets.has(n.id));
+  const el = document.getElementById("handoffMsg");
+  if(!targets.length){
+    if(el) el.innerHTML = `<div class="msg">対象のノートが選ばれていません。上の「① 対象のノート」でチェックを入れてください。</div>`;
+    return;
+  }
+  const text = HANDOFF_HEADER + "\n\n" + targets.map(n => mdForExport(n)).join("\n\n" + BULK_SEP + "\n\n") + "\n";
+  shareOrDownload("kairo-ai-handoff.md", text);
+  if(el) el.innerHTML = `<div class="msg">${targets.length}件のノートを kairo-ai-handoff.md にまとめて書き出しました。</div>`;
+}
+let importProposal = null;
+function openAiImport(){
+  openModal(`<h2>⬆ 編集済みの.mdを取り込む（差分確認）</h2>
+  <p class="small">外部AIが編集した.mdを読みます。タイトルが一致するノートは「更新」、一致しないノートは「新規」として、差分を見てから取り込みます。このままでは何も変わりません。</p>
+  <label class="flabel">ファイルから（.md）</label>
+  <input type="file" id="aiImpFiles" accept=".md,.markdown,.txt" onchange="aiImportFiles(this)">
+  <label class="flabel">貼り付けで取り込む（.mdの中身）</label>
+  <textarea id="aiImpText" rows="6" placeholder="編集済みのMarkdownをここに貼り付け"></textarea>
+  <div class="btnrow"><button class="btn" onclick="aiImportPaste()">差分をプレビュー</button></div>
+  <div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>`);
+}
+async function aiImportFiles(input){
+  const files = Array.from(input.files || []);
+  if(!files.length) return;
+  const texts = [];
+  for(const f of files) texts.push(await f.text());
+  buildImportProposal(texts.join("\n\n" + BULK_SEP + "\n\n"), "ファイル");
+}
+function aiImportPaste(){
+  const ta = document.getElementById("aiImpText");
+  if(!ta || !ta.value.trim()){ alert("取り込む文章が空です。"); return; }
+  buildImportProposal(ta.value, "貼り付け");
+}
+function openAiImportWith(text, sourceLabel){
+  buildImportProposal(text, sourceLabel || "フォルダ");
+}
+function buildImportProposal(text, sourceLabel){
+  const parsed = parseBulkText(text);
+  const items = [];
+  for(const p of parsed){
+    const match = notes.find(n => n.fm.title === p.fm.title);
+    if(match){
+      const merged = { id: match.id, fm: { title: p.fm.title, tags: p.fm.tags, status: p.fm.status, created: match.fm.created, updated: p.fm.updated }, body: p.body };
+      const before = noteToMd(match);
+      const after = noteToMd(merged);
+      if(after === before) continue;
+      items.push({ kind: "update", id: match.id, title: p.fm.title, before, after, parsed: p, checked: true });
+    } else {
+      const after = noteToMd({ id: "new", fm: p.fm, body: p.body });
+      items.push({ kind: "create", id: null, title: p.fm.title, before: "", after, parsed: p, checked: true });
+    }
+  }
+  importProposal = { items, sourceLabel };
+  renderImportProposal();
+}
+function renderImportProposal(){
+  const ip = importProposal;
+  if(!ip) return;
+  const itemsHtml = ip.items.length ? ip.items.map((it, i) => `
+    <div class="action">
+      <label class="checkrow"><input type="checkbox" ${it.checked ? "checked" : ""} onchange="toggleImportItem(${i})">
+      <span><b>${it.kind === "update" ? "更新" : "新規"}：${esc(it.title)}</b></span></label>
+      <div class="diff">${diffHtml(it.before, it.after)}</div>
+    </div>`).join("") : `<p class="small">変更のあるノートはありませんでした（内容が同じか、読み取れるノートがありません）。</p>`;
+  openModal(`<h2>差分の確認（${esc(ip.sourceLabel)}から）</h2>
+  <p class="small">取り込む項目にチェックを入れてください。実行の直前に、控え（スナップショット）を残します。</p>
+  ${itemsHtml}
+  <div id="impPropMsg"></div>
+  <div class="btnrow">
+    ${ip.items.length ? `<button class="btn" onclick="applyImportProposal()">✓ 承認した項目を取り込む</button>` : ""}
+    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+  </div>`);
+}
+function toggleImportItem(i){
+  if(importProposal && importProposal.items[i]) importProposal.items[i].checked = !importProposal.items[i].checked;
+}
+async function applyImportProposal(){
+  const ip = importProposal;
+  if(!ip) return;
+  const chosen = ip.items.filter(it => it.checked);
+  if(!chosen.length){
+    const el = document.getElementById("impPropMsg");
+    if(el) el.innerHTML = `<div class="msg">取り込む項目が選ばれていません。</div>`;
+    return;
+  }
+  await takeSnapshot("外部取り込みの実行前");
+  let upd = 0, cre = 0;
+  for(const it of chosen){
+    if(it.kind === "update"){
+      const n = getNote(it.id);
+      if(!n) continue;
+      n.fm.title = it.parsed.fm.title;
+      n.fm.tags = it.parsed.fm.tags;
+      n.fm.status = it.parsed.fm.status;
+      n.body = it.parsed.body;
+      await persistNote(n);
+      upd++;
+    } else {
+      const n = await createNote(it.parsed.fm.title, it.parsed.body, it.parsed.fm.tags, it.parsed.fm.status);
+      if(it.parsed.fm.created && it.parsed.fm.created !== n.fm.created){
+        n.fm.created = it.parsed.fm.created;
+        await persistNote(n);
+      }
+      cre++;
+    }
+  }
+  importProposal = null;
+  view = "doc";
+  openModal(`<h2>取り込みました</h2>
+  <p class="small">更新 ${upd} 件・新規 ${cre} 件を取り込みました。実行前の控えを残してあるので、AI画面の「スナップショットとロールバック」から元に戻せます。</p>
+  <div class="btnrow"><button class="btn" onclick="closeModal(); render();">閉じる</button></div>`);
+  render();
+}
+/* ============ フォルダ連携（File System Access・対応環境のみ） ============ */
+const FS_OK = typeof window.showDirectoryPicker === "function";
+let dirHandle = null;
+function fsMsg(t){
+  const el = document.getElementById("fsMsg");
+  if(el) el.innerHTML = t ? `<div class="msg">${esc(t)}</div>` : "";
+}
+async function fsPickDir(){
+  try{
+    dirHandle = await window.showDirectoryPicker();
+    fsMsg("フォルダを選びました：" + dirHandle.name);
+  }catch(e){ /* キャンセル時は何もしない */ }
+}
+async function fsExport(){
+  if(!dirHandle){ fsMsg("先にフォルダを選んでください。"); return; }
+  try{
+    let count = 0;
+    for(const n of sortedNotes()){
+      const fh = await dirHandle.getFileHandle(safeName(n.fm.title) + ".md", { create: true });
+      const w = await fh.createWritable();
+      await w.write(mdForExport(n));
+      await w.close();
+      count++;
+    }
+    fsMsg(count + "件のノートをフォルダへ書き出しました。");
+  }catch(e){ fsMsg("書き出しに失敗しました：" + (e && e.message ? e.message : e)); }
+}
+async function fsImport(){
+  if(!dirHandle){ fsMsg("先にフォルダを選んでください。"); return; }
+  try{
+    const texts = [];
+    for await(const h of dirHandle.values()){
+      if(h.kind === "file" && /\.md$/i.test(h.name)){
+        const f = await h.getFile();
+        texts.push(await f.text());
+      }
+    }
+    if(!texts.length){ fsMsg("フォルダに.mdファイルがありませんでした。"); return; }
+    openAiImportWith(texts.join("\n\n" + BULK_SEP + "\n\n"), "フォルダ");
+  }catch(e){ fsMsg("読み込みに失敗しました：" + (e && e.message ? e.message : e)); }
 }
 /* ============ 作成メニュー（テキスト／手書き／音声） ============ */
 function openCreateMenu(){
