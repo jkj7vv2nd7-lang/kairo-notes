@@ -149,7 +149,7 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 <div id="modalRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.2.0";
+const APP_VER = "1.2.1";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -987,7 +987,7 @@ function settingsViewHtml(){
   ${aiSettingsCardHtml()}
   ${FS_OK ? `<div class="card">
     <h2>📁 フォルダ連携（PC Chrome）</h2>
-    <p class="small">選んだフォルダの.mdファイルを直接読み書きします。フォルダの指定は、このタブを開いている間だけ有効です。読み込みは差分を確認してから取り込む形で、無断で上書きしません。</p>
+    <p class="small">選んだフォルダの.mdファイルを直接読み書きします。フォルダの指定は、このタブを開いている間だけ有効です。選ぶときに読み書きの許可の確認が出たら、「許可」を選んでください。読み込みは差分を確認してから取り込む形で、無断で上書きしません。</p>
     <div class="btnrow">
       <button class="btn sub" onclick="fsPickDir()">📁 フォルダを選ぶ</button>
       <button class="btn sub" onclick="fsImport()">⬆ フォルダから読み込む</button>
@@ -1368,12 +1368,41 @@ function fsMsg(t){
 }
 async function fsPickDir(){
   try{
-    dirHandle = await window.showDirectoryPicker();
-    fsMsg("フォルダを選びました：" + dirHandle.name);
-  }catch(e){ /* キャンセル時は何もしない */ }
+    const handle = await window.showDirectoryPicker();
+    const perm = await fsPermState(handle, true);
+    if(perm !== "granted"){
+      dirHandle = null;
+      fsMsg("フォルダへの読み書きが許可されませんでした。もう一度「フォルダを選ぶ」を押して、許可の確認では「許可」を選んでください。");
+      return;
+    }
+    dirHandle = handle;
+    fsMsg("フォルダを選びました：" + handle.name + "（⬆ 読み込み・⬇ 書き出しが使えます）");
+  }catch(e){
+    if(e && e.name === "AbortError"){
+      fsMsg("フォルダの選択がキャンセルされました。使うときは「フォルダを選ぶ」から選んでください。");
+    } else {
+      fsMsg("フォルダを選べませんでした（" + (e && e.name ? e.name : "エラー") + "）。もう一度お試しください。");
+    }
+  }
+}
+async function fsPermState(handle, request){
+  if(!handle) return "denied";
+  try{
+    if(handle.queryPermission){
+      const q = await handle.queryPermission({ mode: "readwrite" });
+      if(q === "granted") return "granted";
+    }
+    if(request && handle.requestPermission){
+      return await handle.requestPermission({ mode: "readwrite" });
+    }
+    return handle.queryPermission ? "denied" : "granted";
+  }catch(e){
+    return "denied";
+  }
 }
 async function fsExport(){
   if(!dirHandle){ fsMsg("先にフォルダを選んでください。"); return; }
+  if(await fsPermState(dirHandle, true) !== "granted"){ fsMsg("フォルダへの読み書きが許可されていません。「フォルダを選ぶ」から選び直してください。"); return; }
   try{
     let count = 0;
     for(const n of sortedNotes()){
@@ -1388,6 +1417,7 @@ async function fsExport(){
 }
 async function fsImport(){
   if(!dirHandle){ fsMsg("先にフォルダを選んでください。"); return; }
+  if(await fsPermState(dirHandle, true) !== "granted"){ fsMsg("フォルダへの読み書きが許可されていません。「フォルダを選ぶ」から選び直してください。"); return; }
   try{
     const texts = [];
     for await(const h of dirHandle.values()){
