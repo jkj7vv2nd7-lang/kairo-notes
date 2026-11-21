@@ -29,6 +29,14 @@ header.top .t .gold{ color:#f2b95c; }
 header.top .sub{ font-size:12px; opacity:.88; letter-spacing:.02em; }
 header.top .sp{ flex:1; }
 .iconbtn{ background:rgba(255,255,255,.16); color:#fff; border:none; border-radius:10px; font-size:18px; padding:8px 12px; cursor:pointer; }
+.focuswrap{ position:fixed; inset:0; background:var(--bg); z-index:60; display:flex; flex-direction:column; }
+.focushead{ display:flex; align-items:center; gap:8px; padding:10px 14px; background:linear-gradient(118deg, #221d54 0%, #3d348b 58%, #5b2a86 100%); color:#fff; border-bottom:3px solid var(--accent); }
+.focushead .ft{ font-weight:800; font-size:16px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.focushead .iconbtn{ font-size:14px; font-weight:700; white-space:nowrap; }
+.focusmeta{ padding:6px 16px; color:var(--muted); font-size:13px; text-align:right; }
+.focusbody{ flex:1; min-height:0; display:flex; justify-content:center; padding:4px 14px 18px; }
+.focusbody textarea{ flex:1; max-width:760px; font-size:18px; line-height:1.9; padding:18px; border:1px solid var(--line); border-radius:12px; background:var(--card); color:var(--ink); resize:none; }
+.focusbody .fpreview{ flex:1; max-width:760px; overflow:auto; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; font-size:17px; }
 main{ padding:14px 14px 110px; max-width:1180px; margin:0 auto; }
 .bottombar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdf8; border-top:1px solid var(--line); display:flex; gap:6px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow:0 -3px 14px rgba(60,50,20,.08); }
 .bottombar button{ flex:1; min-height:54px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; padding:4px 2px; }
@@ -92,7 +100,7 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 .backbtn{ display:none; }
 /* ボード */
 .board{ display:flex; gap:12px; overflow-x:auto; padding-bottom:10px; align-items:flex-start; }
-.col{ flex:none; width:262px; background:#efe9da; border:1px solid var(--line); border-radius:14px; padding:10px; min-height:220px; }
+.col{ flex:none; width:262px; background:#eceaf6; border:1px solid var(--line); border-radius:14px; padding:10px; min-height:220px; }
 .col h3{ margin:2px 2px 10px; font-size:16px; }
 .col .cnt{ color:var(--muted); font-size:13px; }
 .bcard{ background:#fff; border:1px solid var(--line); border-radius:11px; padding:10px 11px; margin-bottom:9px; cursor:grab; touch-action:none; }
@@ -161,9 +169,10 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 </footer>
 <nav class="bottombar" id="bottombar"></nav>
 <div id="modalRoot"></div>
+<div id="focusRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.3.0";
+const APP_VER = "1.4.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -443,7 +452,7 @@ async function replaceAllNotes(list){
 /* ============ サンプルノート（初回起動） ============ */
 const SAMPLES = [
   { title: "Kairoの使い方", tags: ["ガイド"], status: "doing", body:
-"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n- **マップ**：[[ノート名]] のリンクをもとに、ノート同士のつながりを地図で見る場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
+"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n- **マップ**：[[ノート名]] のリンクをもとに、ノート同士のつながりを地図で見る場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## 書くことに集中する\n\n- **集中モード**：ノートを開いて「🎯 集中して書く」を押すと、1つのノートだけが大きく表示されます。文字数と保存の状態が静かに出ます\n- **今日の再会**：一覧の先頭に、しばらく開いていないノートが日替わりで数件出ます\n- **つながり候補**：関連する過去メモのところで「リンクを挿入」を押すと、本文の最後に [[ノート名]] のリンクが入ります\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
   { title: "買い物リストの工夫", tags: ["暮らし", "買い物"], status: "idea", body:
 "# 買い物リストの工夫\n\n## 困りごと\n\n- 買い忘れが多い\n- 同じものを二重に買ってしまう\n\n## 工夫\n\n- 店の売り場の順番に並べ替える\n- 在庫が少なくなった時点でリストに足す\n- 買い物メモは週の初めにリセットする\n\n## 次に試すこと\n\n冷蔵庫の在庫メモと買い物リストを1つのノートにまとめてみる。" },
   { title: "読書メモ：数学の本", tags: ["読書", "数学"], status: "doing", body:
@@ -530,10 +539,11 @@ function docViewHtml(){
   const cur = currentId ? getNote(currentId) : null;
   return `<div class="docwrap ${cur ? "editing" : ""}">
     <div class="notelist">
+      ${reunionHtml()}
       <div class="card" style="padding:12px;">
         <input type="text" id="searchBox" placeholder="🔍 ノートを検索" value="${esc(searchQ)}" oninput="searchQ = this.value; renderNoteList();">
         <div style="margin-top:9px;">
-          <span class="chip ${tagFilter === "" ? "on" : ""}" onclick="tagFilter = ''; render();">すべて</span>${allTags().map(t => `<span class="chip ${tagFilter === t ? "on" : ""}" onclick="tagFilter = '${esc(t)}'; render();">${esc(t)}</span>`).join("")}
+          <span class="chip ${tagFilter === "" ? "on" : ""}" onclick="tagFilter = ''; render();">すべて</span>${allTags().map((t, i) => `<span class="chip ${tagFilter === t ? "on" : ""}" onclick="tagFilter = allTags()[${i}]; render();">${esc(t)}</span>`).join("")}
         </div>
         <div class="btnrow" style="margin-bottom:0;">
           <button class="btn sub" onclick="openImport()">⬆ 取り込む</button>
@@ -544,6 +554,44 @@ function docViewHtml(){
     </div>
     <div class="editor" id="editorPane">${cur ? editorHtml(cur) : emptyEditorHtml()}</div>
   </div>`;
+}
+/* ============ 今日の再会（起動時のリサーフェシング） ============ */
+function reunionTodayKey(){ const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function reunionNotes(){
+  const now = Date.now();
+  const cand = notes.filter(n => now - new Date(n.fm.updated).getTime() >= 3 * 86400000);
+  if(!cand.length) return [];
+  const sorted = cand.slice().sort((a, b) => a.fm.updated < b.fm.updated ? -1 : 1);
+  const start = Math.floor(now / 86400000) % sorted.length;
+  const out = [];
+  for(let k = 0; k < Math.min(3, sorted.length); k++) out.push(sorted[(start + k) % sorted.length]);
+  return out;
+}
+function reunionHtml(){
+  if(searchQ || tagFilter) return "";
+  let closed = "";
+  try{ closed = localStorage.getItem("kairo-reunion-closed") || ""; }catch(e){}
+  if(closed === reunionTodayKey()) return "";
+  const list = reunionNotes();
+  if(!list.length) return "";
+  const now = Date.now();
+  return `<div class="card">
+    <h2>🔁 今日の再会</h2>
+    <p class="small" style="margin-top:0;">しばらく開いていないノートです。めぐり直すと、新しいつながりが見えるかもしれません。</p>
+    ${list.map(n => {
+      const days = Math.floor((now - new Date(n.fm.updated).getTime()) / 86400000);
+      const ago = days >= 30 ? "約" + Math.floor(days / 30) + "か月ぶり" : days + "日ぶり";
+      return `<div class="relrow">
+        <div class="relmain"><b>${esc(n.fm.title)}</b><br><span class="small">${ago} ／ 更新 ${fmtDate(n.fm.updated)}</span></div>
+        <button class="mini" onclick="openNote('${n.id}')">開く</button>
+      </div>`;
+    }).join("")}
+    <div style="text-align:right; margin-top:6px;"><button class="mini" onclick="closeReunion()">今日は閉じる</button></div>
+  </div>`;
+}
+function closeReunion(){
+  try{ localStorage.setItem("kairo-reunion-closed", reunionTodayKey()); }catch(e){}
+  render();
 }
 function hlHtml(text){
   const e = esc(text);
@@ -593,7 +641,7 @@ function emptyEditorHtml(){
   return `<div class="card" style="text-align:center; padding:34px 18px;">
     <div style="font-size:40px;">📄</div>
     <h2>書くノートを選んでください</h2>
-    <p class="small">左のリストからノートを選ぶと、ここで編集できます。<br>初めての方は、サンプル「Kairoの使い方」がおすすめです。</p>
+    <p class="small">リストからノートを選ぶと、ここで編集できます。<br>初めての方は、サンプル「Kairoの使い方」がおすすめです。</p>
     <button class="btn" onclick="newNote()">＋ 新しいノートを作る</button>
   </div>`;
 }
@@ -650,6 +698,7 @@ function editorHtml(n){
     <div class="btnrow">
       <button class="btn sub" onclick="openPad('${n.id}')">✍️ 手書きメモをこのノートに追加</button>
       <button class="btn sub" onclick="openHistory('${n.id}')">🕘 履歴</button>
+      <button class="btn sub" onclick="openFocus()">🎯 集中して書く</button>
     </div>
   </div>
   <div class="card outline">
@@ -686,16 +735,24 @@ function editField(field, value){
   else if(field === "body") n.body = value;
   scheduleSave();
 }
+let dirtyIds = new Set();
 function scheduleSave(){
+  if(currentId) dirtyIds.add(currentId);
   if(saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const n = currentId ? getNote(currentId) : null;
-    if(!n) return;
-    await persistNote(n);
-    renderNoteList();
-    const rel = document.getElementById("relCard");
-    if(rel) rel.innerHTML = relatedHtml(n);
-  }, 400);
+  saveTimer = setTimeout(flushSaves, 400);
+}
+async function flushSaves(){
+  saveTimer = null;
+  const ids = Array.from(dirtyIds);
+  dirtyIds.clear();
+  for(const id of ids){
+    const n = getNote(id);
+    if(n) await persistNote(n);
+  }
+  renderNoteList();
+  const cur = currentId ? getNote(currentId) : null;
+  const rel = document.getElementById("relCard");
+  if(rel && cur) rel.innerHTML = relatedHtml(cur);
 }
 function jumpHeading(idx){
   const n = currentId ? getNote(currentId) : null;
@@ -714,7 +771,7 @@ function jumpHeading(idx){
     const lines = n.body.split("\n");
     let seen = -1, pos = 0;
     for(let i = 0; i < lines.length; i++){
-      if(/^#{1,6}\s/.test(lines[i])){ seen++; if(seen === idx){ ta.focus(); ta.setSelectionRange(pos, pos); ta.scrollTop = Math.max(0, (i - 2)) * 22; break; } }
+      if(/^#{1,6}\s/.test(lines[i])){ seen++; if(seen === idx){ ta.focus(); ta.setSelectionRange(pos, pos); const lh = parseFloat(getComputedStyle(ta).lineHeight) || 24; ta.scrollTop = Math.max(0, (i - 2)) * lh; break; } }
       pos += lines[i].length + 1;
     }
   }
@@ -723,6 +780,15 @@ async function duplicateNote(id){
   const n = getNote(id); if(!n) return;
   const t = nowIso();
   const c = { id: uid(), fm: { title: n.fm.title + "（コピー）", tags: n.fm.tags.slice(), status: n.fm.status, created: t, updated: t }, body: n.body };
+  const imgRows = await idbAll("images");
+  for(const r of imgRows){
+    if(r.noteId === id){
+      const nid = uid();
+      await idbPut("images", { id: nid, noteId: c.id, dataUrl: r.dataUrl, created: nowIso() });
+      imgCache[nid] = r.dataUrl;
+      c.body = c.body.split("kairo-img:" + r.id).join("kairo-img:" + nid);
+    }
+  }
   notes.push(c);
   await idbPut("notes", { id: c.id, md: noteToMd(c) });
   currentId = c.id;
@@ -761,15 +827,34 @@ function relatedHtml(n){
   const rel = relatedNotes(n, 5);
   let h = `<h2>🔁 関連する過去メモ</h2>`;
   if(!rel.length) return h + `<p class="small">タグや語句が重なるメモが見つかると、ここに静かに表示されます。</p>`;
-  h += rel.map(r => `<div class="relitem">
+  h += rel.map(r => {
+    const linked = n.body.includes("[[" + r.note.fm.title + "]]");
+    return `<div class="relitem">
     <div class="ttl">${esc(r.note.fm.title)}</div>
     <div class="small">${r.sharedTags.length ? "共通タグ：" + r.sharedTags.map(esc).join("、") + " ／ " : ""}語句の重なりで候補に挙がりました</div>
     <div class="btnrow" style="margin:6px 0 0;">
       <button class="btn sub" style="min-height:40px; font-size:14px;" onclick="openNote('${r.note.id}')">開く</button>
+      ${linked ? `<span class="small" style="align-self:center;">✓ リンク済み</span>` : `<button class="btn sub" style="min-height:40px; font-size:14px;" onclick="insertWikiLink('${r.note.id}')">🔗 リンクを挿入</button>`}
       <button class="btn ${aiTargets.has(r.note.id) ? "ghost" : "sub"}" style="min-height:40px; font-size:14px;" onclick="toggleAiTarget('${r.note.id}')">${aiTargets.has(r.note.id) ? "✓ AI統合の対象に追加済み" : "＋ AI統合の対象に追加"}</button>
     </div>
-  </div>`).join("");
+  </div>`;
+  }).join("");
   return h;
+}
+async function insertWikiLink(targetId){
+  const n = currentId ? getNote(currentId) : null;
+  const t = getNote(targetId);
+  if(!n || !t || n.id === t.id) return;
+  const link = "[[" + t.fm.title + "]]";
+  if(n.body.includes(link)) return;
+  const base = n.body.replace(/\s+$/, "");
+  if(/##\s*関連メモ/.test(n.body)) n.body = base + "\n- " + link + "\n";
+  else n.body = base + "\n\n## 関連メモ\n\n- " + link + "\n";
+  dirtyIds.delete(n.id);
+  if(saveTimer && dirtyIds.size === 0){ clearTimeout(saveTimer); saveTimer = null; }
+  await persistNote(n);
+  renderEditor();
+  renderNoteList();
 }
 function toggleAiTarget(id){
   if(aiTargets.has(id)) aiTargets.delete(id); else aiTargets.add(id);
@@ -778,6 +863,66 @@ function toggleAiTarget(id){
   const rel = document.getElementById("relCard");
   if(rel && n) rel.innerHTML = relatedHtml(n);
   if(view === "ai") render();
+}
+/* ============ 集中執筆モード ============ */
+let focusMode = "edit";
+let focusSavedText = "自動保存されます";
+let focusTimer = null;
+function focusMetaText(n){ return "本文 " + n.body.length + " 文字 ／ " + focusSavedText; }
+function openFocus(){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  focusMode = "edit";
+  focusSavedText = "自動保存されます";
+  renderFocus();
+  const ta = document.getElementById("focusBody");
+  if(ta) ta.focus();
+}
+function renderFocus(){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  $("#focusRoot").innerHTML = `<div class="focuswrap">
+    <div class="focushead"><span class="ft">🎯 ${esc(n.fm.title)}</span>
+      <button class="iconbtn" onclick="toggleFocusMode()">${focusMode === "edit" ? "👀 プレビュー" : "✏️ 編集"}</button>
+      <button class="iconbtn" onclick="closeFocus()">✕ 終わる</button>
+    </div>
+    <div class="focusmeta" id="focusMeta">${focusMetaText(n)}</div>
+    ${focusMode === "edit"
+      ? `<div class="focusbody"><textarea id="focusBody" oninput="focusInput(this.value)" placeholder="ここに集中して書けます">${esc(n.body)}</textarea></div>`
+      : `<div class="focusbody"><div class="preview fpreview">${blocksToHtml(parseBlocks(n.body))}</div></div>`}
+  </div>`;
+}
+function focusInput(v){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  n.body = v;
+  focusSavedText = "入力中…";
+  const m = document.getElementById("focusMeta");
+  if(m) m.textContent = focusMetaText(n);
+  if(focusTimer) clearTimeout(focusTimer);
+  focusTimer = setTimeout(() => flushFocusSave(), 600);
+}
+async function flushFocusSave(){
+  if(focusTimer){ clearTimeout(focusTimer); focusTimer = null; }
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  dirtyIds.delete(n.id);
+  await persistNote(n);
+  focusSavedText = "保存しました " + fmtDate(nowIso()).slice(11);
+  const m = document.getElementById("focusMeta");
+  if(m) m.textContent = focusMetaText(n);
+  renderNoteList();
+}
+async function toggleFocusMode(){
+  await flushFocusSave();
+  focusMode = focusMode === "edit" ? "preview" : "edit";
+  renderFocus();
+}
+async function closeFocus(){
+  await flushFocusSave();
+  $("#focusRoot").innerHTML = "";
+  renderEditor();
+  renderNoteList();
 }
 /* ============ 取り込み・書き出し ============ */
 const BULK_SEP = "<!-- ===== Kairo note ===== -->";
@@ -953,7 +1098,7 @@ async function setNoteStatus(id, status){
 function boardViewHtml(){
   const list = boardTagFilter ? sortedNotes().filter(n => n.fm.tags.includes(boardTagFilter)) : sortedNotes();
   return `<div class="card" style="padding:12px;">
-      <div><span class="chip ${boardTagFilter === "" ? "on" : ""}" onclick="boardTagFilter = ''; render();">すべて</span>${allTags().map(t => `<span class="chip ${boardTagFilter === t ? "on" : ""}" onclick="boardTagFilter = '${esc(t)}'; render();">${esc(t)}</span>`).join("")}</div>
+      <div><span class="chip ${boardTagFilter === "" ? "on" : ""}" onclick="boardTagFilter = ''; render();">すべて</span>${allTags().map((t, i) => `<span class="chip ${boardTagFilter === t ? "on" : ""}" onclick="boardTagFilter = allTags()[${i}]; render();">${esc(t)}</span>`).join("")}</div>
       <p class="small" style="margin:6px 0 0;">カードはドラッグで別の列へ動かせます。タップすると文書で開きます。下の欄でも状態を変えられます。</p>
     </div>
     <div class="board">${Object.keys(STATUSES).map(st => {
@@ -1224,7 +1369,7 @@ function settingsViewHtml(){
   </div>
   <div class="card">
     <h2>ℹ️ このアプリについて</h2>
-    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第3期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、外部AIとの受け渡しも差分確認つきです。</p>
+    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第5期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。</p>
   </div>`;
 }
 /* ============ AI Librarian（差分プレビュー→承認→実行／ロールバック） ============ */
@@ -2061,7 +2206,6 @@ async function boot(){
   await loadImgCache();
   const seeded = await metaGet("seeded", false);
   if(!seeded && notes.length === 0) await seedSamples();
-  if(notes.length && !currentId) currentId = sortedNotes()[0].id;
   render();
   if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 }
