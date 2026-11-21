@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Kairo ノート ― MarkdownノートOS</title>
+<title>Kairo Note ― MarkdownノートOS</title>
 <meta name="description" content="標準Markdownを基盤にした、ローカルファーストのノートアプリ。文書・ボード・キャンバスの3視点と、非破壊のAI整理。">
 <meta name="theme-color" content="#2e2766">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta property="og:title" content="Kairo ノート ― MarkdownノートOS">
+<meta property="og:title" content="Kairo Note ― MarkdownノートOS">
 <meta property="og:description" content="記録と整理を分断しない、ローカルファーストのMarkdownノート。AI整理は差分プレビュー→承認→実行（ロールバック可）の非破壊設計。">
 <meta property="og:type" content="website">
 <meta property="og:image" content="og-image.png">
@@ -165,6 +165,11 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .seg2{ display:inline-flex; border:1.5px solid var(--line); border-radius:999px; overflow:hidden; }
 .seg2 button{ border:0; background:#fff; padding:9px 16px; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; min-height:44px; }
 .seg2 button.on{ background:var(--teal); color:#fff; }
+.mdbar{ display:flex; flex-wrap:wrap; gap:6px; margin:0 0 8px; }
+.mdbar button{ min-height:40px; padding:6px 11px; border:1.5px solid var(--line); background:#fff; border-radius:9px; font-size:13.5px; font-weight:700; color:var(--ink); cursor:pointer; }
+.mdbar button:active{ background:#efeafd; }
+.sortrow{ display:flex; align-items:center; gap:8px; margin-top:10px; }
+.sortrow select{ min-height:40px; border:1.5px solid var(--line); border-radius:9px; padding:6px 10px; font-size:14px; background:#fff; color:var(--ink); }
 
 /* 第7期：広い画面の上部ナビ */
 .topnav{ display:none; }
@@ -183,13 +188,38 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
   main{ padding-bottom:24px; }
   footer{ padding-bottom:16px; }
 }
+
+.trow{ display:flex; align-items:center; gap:9px; }
+.brandanim{ flex:none; overflow:visible; }
+.brandanim .bl{ stroke:#e8a33d; stroke-width:2; stroke-linecap:round; stroke-dasharray:100; stroke-dashoffset:100; opacity:0; animation:brandDraw 4.4s ease-in-out infinite; }
+.brandanim .bl2{ animation-delay:.35s; }
+.brandanim .bl3{ animation-delay:.7s; }
+.brandanim .bn{ fill:#fffefa; stroke:#e8a33d; stroke-width:1.6; transform-origin:center; transform-box:fill-box; animation:brandPulse 4.4s ease-in-out infinite; }
+.brandanim .bn2{ animation-delay:.35s; }
+.brandanim .bn3{ animation-delay:.7s; }
+@keyframes brandDraw{
+  0%{ stroke-dashoffset:100; opacity:0; }
+  10%{ opacity:.95; }
+  38%{ stroke-dashoffset:0; opacity:1; }
+  72%{ stroke-dashoffset:0; opacity:1; }
+  90%{ stroke-dashoffset:0; opacity:.25; }
+  100%{ stroke-dashoffset:100; opacity:0; }
+}
+@keyframes brandPulse{
+  0%, 100%{ transform:scale(1); }
+  42%{ transform:scale(1.3); }
+}
+@media (prefers-reduced-motion: reduce){
+  .brandanim .bl, .brandanim .bn{ animation:none !important; }
+  .brandanim .bl{ stroke-dashoffset:0; opacity:1; }
+}
 </style>
 </head>
 <body>
 <header class="top">
   <img src="icon-192.png" alt="">
   <div>
-    <div class="t">Kairo <span class="gold">ノート</span></div>
+    <div class="trow"><div class="t">Kairo <span class="gold">Note</span></div><svg class="brandanim" width="44" height="32" viewBox="0 0 48 34" aria-hidden="true"><line class="bl" x1="10" y1="24" x2="24" y2="9" pathLength="100"/><line class="bl bl2" x1="24" y1="9" x2="38" y2="21" pathLength="100"/><line class="bl bl3" x1="10" y1="24" x2="38" y2="21" pathLength="100"/><circle class="bn" cx="10" cy="24" r="3.4"/><circle class="bn bn2" cx="24" cy="9" r="3.4"/><circle class="bn bn3" cx="38" cy="21" r="3.4"/></svg></div>
     <div class="sub" id="hdrTag">MarkdownノートOS ― 記録と整理を分断しない</div>
   </div>
   <div class="sp"></div>
@@ -198,7 +228,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 </header>
 <main id="app"></main>
 <footer>
-  <div><span id="footLine">Kairo ノート</span> ver <span id="verFoot">1.0.0</span> <span id="footNote">／ ノートはこの端末の中（IndexedDB）にだけ保存されます</span></div>
+  <div><span id="footLine">Kairo Note</span> ver <span id="verFoot">1.0.0</span> <span id="footNote">／ ノートはこの端末の中（IndexedDB）にだけ保存されます</span></div>
   <div style="margin-top:8px;"><button class="btn ghost" id="updBtn" style="min-height:40px; padding:6px 14px; font-size:14px;" onclick="updateApp()">最新の版に更新する</button></div>
 </footer>
 <nav class="bottombar" id="bottombar"></nav>
@@ -206,7 +236,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="focusRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.6.0";
+const APP_VER = "1.7.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -311,6 +341,21 @@ const STR = {
   tr_run: ["英訳する", "Translate"], tr_running: ["英訳しています…", "Translating…"],
   tr_draft_label: ["英訳の下書き（取り込む前に直せます）", "Translation draft (editable before applying)"],
   tr_apply: ["本文に取り込む", "Apply to text"], tr_failed: ["英訳できませんでした：", "Translation failed: "],
+  tb_bold: ["太字", "Bold"], tb_head: ["見出し", "Heading"], tb_list: ["リスト", "List"],
+  tb_numlist: ["番号リスト", "Numbered"], tb_link: ["リンク", "Link"], tb_quote: ["引用", "Quote"],
+  tb_code: ["コード", "Code"], tb_check: ["チェック", "Check"],
+  sort_label: ["並び替え", "Sort"], sort_updated: ["更新順", "Recently updated"],
+  sort_created: ["作成順", "Recently created"], sort_title: ["タイトル順", "Title"],
+  walk_card_title: ["📖 見本ノート「Kairoの歩き方」", "📖 Sample notes: Walking with Kairo"],
+  walk_card_desc: ["リンク・タグ・ボード・マップを体験できる、つながった見本ノート5件です。初回起動のときだけ自動で入ります。あとから入れたい場合はこのボタンで追加できます（同じ題名がある分は飛ばします）。見本は普通のノートなので、自由に消せます。", "Five linked sample notes to try links, tags, the board, and the map. They are added automatically only on a fresh start; use this button to add them later (titles you already have are skipped). They are ordinary notes — delete them freely."],
+  walk_add_btn: ["見本ノートを追加する", "Add the sample notes"],
+  q_btn: ["💭 問いかけ", "💭 Questions"], q_title: ["💭 AIの問いかけ", "💭 Questions from AI"],
+  q_desc: ["このノートをもとに、考えを深める問いや別の視点をAIが提案します。気に入ったものだけ「本文に挿入」できます。本文は勝手に変わりません。", "AI suggests questions and other viewpoints based on this note. Insert only the ones you like — your text never changes on its own."],
+  q_run: ["問いを考える", "Think of questions"], q_running: ["AIが考えています…", "AI is thinking…"],
+  q_insert: ["本文に挿入", "Insert into note"], q_inserted: ["✓ 挿入しました", "✓ Inserted"],
+  q_need_ai: ["問いかけにはAI接続が必要です", "Questions need an AI connection"],
+  q_need_ai_desc: ["AI「問いかけ」は任意機能です。設定でAI接続をONにして、ご自身のAPIキー（またはOllama）を設定すると使えます。キーはこの端末の中にだけ保存されます。", "Questions are optional. Turn on the AI connection in Settings with your own API key (or Ollama) to use them. Keys are stored only on this device."],
+  q_failed: ["問いかけを作れませんでした：", "Could not create questions: "],
   settings_go: ["⚙ 設定を開く", "⚙ Open Settings"],
   tip_new: ["新しいノートを作ります（テキスト・手書き・音声）", "Create a new note (text, handwriting, or voice)"],
   tip_doc: ["ノートの一覧と編集。書く・直す・探す場所です", "List and edit your notes — where you write, revise, and search"],
@@ -527,10 +572,18 @@ let aiTargets = new Set();
 try{ (JSON.parse(localStorage.getItem("kairo-ai-targets") || "[]")).forEach(id => aiTargets.add(id)); }catch(e){}
 function saveAiTargets(){ try{ localStorage.setItem("kairo-ai-targets", JSON.stringify(Array.from(aiTargets))); }catch(e){} }
 function getNote(id){ return notes.find(n => n.id === id) || null; }
+let SORT_MODE = localStorage.getItem("kairo-sort") || "updated";
+function setSort(v){
+  SORT_MODE = v;
+  localStorage.setItem("kairo-sort", v);
+  renderNoteList();
+}
 function sortedNotes(){
   return notes.slice().sort((a, b) => {
     const pa = isPinned(a.id) ? 0 : 1, pb = isPinned(b.id) ? 0 : 1;
     if(pa !== pb) return pa - pb;
+    if(SORT_MODE === "created") return String(b.fm.created).localeCompare(String(a.fm.created));
+    if(SORT_MODE === "title") return a.fm.title.localeCompare(b.fm.title, "ja");
     return String(b.fm.updated).localeCompare(String(a.fm.updated));
   });
 }
@@ -620,7 +673,7 @@ async function replaceAllNotes(list){
 /* ============ サンプルノート（初回起動） ============ */
 const SAMPLES = [
   { title: "Kairoの使い方", tags: ["ガイド"], status: "doing", body:
-"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n- **マップ**：[[ノート名]] のリンクをもとに、ノート同士のつながりを地図で見る場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## 書くことに集中する\n\n- **集中モード**：ノートを開いて「🎯 集中して書く」を押すと、1つのノートだけが大きく表示されます。文字数と保存の状態が静かに出ます\n- **今日の再会**：一覧の先頭に、しばらく開いていないノートが日替わりで数件出ます\n- **つながり候補**：関連する過去メモのところで「リンクを挿入」を押すと、本文の最後に [[ノート名]] のリンクが入ります\n\n## 表示と英訳（第6期）\n\n- 設定で、画面の言語を日本語／英語に切り替えられます（ノートの内容は変わりません）\n- 設定の文字サイズ（標準／大／特大）は、編集・プレビュー・集中モードに反映されます\n- ノートは「📌 ピン留め」で一覧の先頭に固定できます\n- AIキーがあるときは、編集画面で文章を選んで「🌐 英訳」を押すと、英訳の下書きが作れます（取り込むかどうかは確認してから）\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
+"# Kairoの使い方\n\nKairoは、標準Markdownで書くローカルファーストのノートです。\n\n## 3つの視点\n\n- **文書**：書く・読む・直す場所。見出しアウトラインとプレビューがあります\n- **ボード**：状態（アイデア／進行中／完了／保管）で並べるカンバンです\n- **キャンバス**：カードを自由に置いて、眺めて考える場所です\n- **マップ**：[[ノート名]] のリンクをもとに、ノート同士のつながりを地図で見る場所です\n\nどの視点も同じノートを見ています。複製は作られません。\n\n## 書くことに集中する\n\n- **集中モード**：ノートを開いて「🎯 集中して書く」を押すと、1つのノートだけが大きく表示されます。文字数と保存の状態が静かに出ます\n- **今日の再会**：一覧の先頭に、しばらく開いていないノートが日替わりで数件出ます\n- **つながり候補**：関連する過去メモのところで「リンクを挿入」を押すと、本文の最後に [[ノート名]] のリンクが入ります\n\n## 表示と英訳（第6期）\n\n- 設定で、画面の言語を日本語／英語に切り替えられます（ノートの内容は変わりません）\n- 設定の文字サイズ（標準／大／特大）は、編集・プレビュー・集中モードに反映されます\n- ノートは「📌 ピン留め」で一覧の先頭に固定できます\n- AIキーがあるときは、編集画面で文章を選んで「🌐 英訳」を押すと、英訳の下書きが作れます（取り込むかどうかは確認してから）\n\n## 書くときの道具（第8期）\n\n- **入力支援ボタン**：編集画面の上のボタンで、太字・見出し・リスト・リンクなどを、選んだ文章に付けたりカーソルの位置に入れたりできます\n- **並び替え**：一覧は更新順／作成順／タイトル順に並べ替えられます（ピン留めはいつも先頭）\n- **見本ノート**：初めてのときは「Kairoの歩き方」という見本一式が入ります。あとから設定で追加もできます\n- **AIの問いかけ**：AIキーがあるとき、開いているノートをもとに考えを深める問いを提案します（本文へは選んだものだけ）\n\n## AI整理（任意）\n\n「AI整理」から、複数のメモの統合案や整理案を作れます。AIの案は**差分プレビューで確認し、承認したものだけ**が実行されます。実行前には控え（スナップショット）が残り、いつでもロールバックできます。\n\n## データについて\n\nノートはこの端末の中にだけ保存されます。本文は素のMarkdown（フロントマター付き）で、書き出せば他のエディタでもそのまま開けます。" },
   { title: "買い物リストの工夫", tags: ["暮らし", "買い物"], status: "idea", body:
 "# 買い物リストの工夫\n\n## 困りごと\n\n- 買い忘れが多い\n- 同じものを二重に買ってしまう\n\n## 工夫\n\n- 店の売り場の順番に並べ替える\n- 在庫が少なくなった時点でリストに足す\n- 買い物メモは週の初めにリセットする\n\n## 次に試すこと\n\n冷蔵庫の在庫メモと買い物リストを1つのノートにまとめてみる。" },
   { title: "読書メモ：数学の本", tags: ["読書", "数学"], status: "doing", body:
@@ -628,7 +681,41 @@ const SAMPLES = [
   { title: "旅行の計画メモ", tags: ["旅行", "買い物"], status: "idea", body:
 "# 旅行の計画メモ\n\n## 行きたい場所\n\n- 海の見える駅\n- 古い商店街\n\n## 持ち物と買い物\n\n- 旅行前に買うもの：小さなポーチ、折りたたみ傘\n- 現地で買いたいもの：地元のお菓子\n\n## メモ\n\n切符は早めに取る。帰りの時間を先に決めると、計画が立てやすい。" }
 ];
+const WALK_SAMPLES = [
+  { title: "Kairoの歩き方（入口）", tags: ["ガイド", "歩き方"], status: "doing", body:
+"# Kairoの歩き方（入口）\n\nこの見本は、Kairoの使い方を「歩きながら」体験するためのノート一式です。\n\n## 歩き方\n\n- [[歩き方1：リンクでつなぐ]] ― ノート同士を [[ ]] でつなぐ体験\n- [[歩き方2：ボードで進める]] ― 状態を変えてボードで眺める体験\n- [[歩き方3：マップで眺める]] ― つながりを地図で見る体験\n- [[歩き方4：AIと考える]] ― 任意のAI機能の考え方\n\n## 楽しみ方\n\nリンク（色のついた文字）を押すと、つながったノートへ移動できます。移動先のノートには「リンク元」として、この入口が出ます。\n\n見本は普通のノートです。書き換えても、消しても大丈夫です。" },
+  { title: "歩き方1：リンクでつなぐ", tags: ["歩き方", "書き方"], status: "done", body:
+"# 歩き方1：リンクでつなぐ\n\n本文に [[ノートの題名]] と書くと、そのノートへのリンクになります。\n\n- このノートからは [[Kairoの歩き方（入口）]] と [[歩き方3：マップで眺める]] へつながっています\n- リンク先のノートには「リンク元」として、このノートが表示されます\n- まだ無い題名を書くと、薄い色の「未作成」表示になります（例：[[いつか書きたいノート]]）\n\nリンクは、マップ画面で線として見えます。次は [[歩き方3：マップで眺める]] を開いてみてください。" },
+  { title: "歩き方2：ボードで進める", tags: ["歩き方", "整理"], status: "doing", body:
+"# 歩き方2：ボードで進める\n\nノートには状態（アイデア／進行中／完了／保管）があります。\n\n- このノートは「進行中」です。ボード画面では「進行中」の列に出ます\n- ボードでカードを別の列へドラッグすると、状態が変わります\n- 見本一式の状態は、入口＝進行中、このノート＝進行中、リンク＝完了、マップ＝アイデア、AI＝保管、とばらけさせてあります\n\n状態を変える練習に、このノートを「完了」にしてみてください。やり方はボードでドラッグ、または編集画面の状態の欄から選べます。\n\n入口に戻る：[[Kairoの歩き方（入口）]]" },
+  { title: "歩き方3：マップで眺める", tags: ["歩き方", "眺める"], status: "idea", body:
+"# 歩き方3：マップで眺める\n\nマップ画面では、[[ ]] のリンクが線になって見えます。\n\n- この見本一式は、入口を中心に線が集まる形になっています\n- 点をドラッグで動かせます（位置は保存されます）\n- リンクの無いノートは、薄い色の点で離れて出ます\n\nこのノートからは [[歩き方1：リンクでつなぐ]] と [[Kairoの歩き方（入口）]] へ線が伸びています。マップで確かめてみてください。" },
+  { title: "歩き方4：AIと考える", tags: ["歩き方", "AI"], status: "keep", body:
+"# 歩き方4：AIと考える\n\nAI機能は、すべて任意で、初期設定はOFFです。\n\n- **AI整理**：複数のノートの統合や整理の案を、差分プレビューで確認してから実行します\n- **英訳**：編集画面で文章を選んで、英訳の下書きを作ります\n- **問いかけ**：開いているノートをもとに、考えを深める問いを提案します。本文へは、選んだものだけが入ります\n\nどれも「AIの案は下書き」という約束で作られています。\n\n入口に戻る：[[Kairoの歩き方（入口）]]" }
+];
+async function addWalkSamples(){
+  let added = 0;
+  for(const s of WALK_SAMPLES){
+    if(notes.some(n => n.fm.title === s.title)) continue;
+    const t = nowIso();
+    const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
+    notes.push(n);
+    await idbPut("notes", { id: n.id, md: noteToMd(n) });
+    added++;
+  }
+  const el = document.getElementById("walkMsg");
+  if(el) el.innerHTML = `<div class="msg">${esc(LANG === "en"
+    ? (added ? added + " sample notes added." : "All sample notes are already here.")
+    : (added ? "見本ノートを" + added + "件追加しました。" : "見本ノートは、すでに入っています。"))}</div>`;
+  return added;
+}
 async function seedSamples(){
+  for(const s of WALK_SAMPLES){
+    const t = nowIso();
+    const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
+    notes.push(n);
+    await idbPut("notes", { id: n.id, md: noteToMd(n) });
+  }
   for(const s of SAMPLES){
     const t = nowIso();
     const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
@@ -742,6 +829,14 @@ function docViewHtml(){
         <div class="btnrow" style="margin-bottom:0;">
           <button class="btn sub" onclick="openImport()">${t("import_btn")}</button>
           <button class="btn sub" onclick="openExportAll()">${t("export_all_btn")}</button>
+        </div>
+        <div class="sortrow">
+          <label class="small" for="sortSel">${t("sort_label")}</label>
+          <select id="sortSel" onchange="setSort(this.value)">
+            <option value="updated" ${SORT_MODE === "updated" ? "selected" : ""}>${t("sort_updated")}</option>
+            <option value="created" ${SORT_MODE === "created" ? "selected" : ""}>${t("sort_created")}</option>
+            <option value="title" ${SORT_MODE === "title" ? "selected" : ""}>${t("sort_title")}</option>
+          </select>
         </div>
       </div>
       <div id="noteList">${noteListHtml()}</div>
@@ -881,7 +976,17 @@ function editorHtml(n){
       <button class="${edMode === "preview" ? "on" : ""}" onclick="setEdMode('preview')">${t("seg_preview")}</button>
     </div>
     ${edMode === "edit"
-      ? `<textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
+      ? `<div class="mdbar">
+          <button onpointerdown="mdPress(event, 'bold')"><b>B</b> ${t("tb_bold")}</button>
+          <button onpointerdown="mdPress(event, 'head')">H ${t("tb_head")}</button>
+          <button onpointerdown="mdPress(event, 'list')">• ${t("tb_list")}</button>
+          <button onpointerdown="mdPress(event, 'numlist')">1. ${t("tb_numlist")}</button>
+          <button onpointerdown="mdPress(event, 'check')">☑ ${t("tb_check")}</button>
+          <button onpointerdown="mdPress(event, 'quote')">&gt; ${t("tb_quote")}</button>
+          <button onpointerdown="mdPress(event, 'link')">🔗 ${t("tb_link")}</button>
+          <button onpointerdown="mdPress(event, 'code')">&lt;/&gt; ${t("tb_code")}</button>
+        </div>
+        <textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
       : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
     <div class="small" style="margin-top:8px;">${t("autosave")} ／ ${t("updated")} ${fmtDate(n.fm.updated)}</div>
     <div class="btnrow">
@@ -897,6 +1002,7 @@ function editorHtml(n){
     <div class="btnrow">
       <button class="btn sub" onclick="togglePin('${n.id}')">${isPinned(n.id) ? t("pinned_btn") : t("pin_btn")}</button>
       <button class="btn sub" onclick="openTranslate()">${t("translate_btn")}</button>
+      <button class="btn sub" onclick="openQuestions()">${t("q_btn")}</button>
     </div>
   </div>
   <div class="card outline">
@@ -1547,8 +1653,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo ノート ver " + APP_VER + " ― MarkdownノートOS 第7期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。";
-  const aboutEn = "Kairo Notes ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets).";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick).";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -1577,6 +1683,12 @@ function settingsViewHtml(){
     <div id="fsMsg"></div>
   </div>` : ""}
   <div class="card">
+    <h2>${t("walk_card_title")}</h2>
+    <p class="small">${t("walk_card_desc")}</p>
+    <div class="btnrow"><button class="btn sub" onclick="addWalkSamples()">${t("walk_add_btn")}</button></div>
+    <div id="walkMsg"></div>
+  </div>
+  <div class="card">
     <h2>${t("data_title")}</h2>
     <p class="small">${LANG === "en"
       ? notes.length + " notes are stored in this device's IndexedDB, as plain Markdown with front matter. Use Export all on the Notes screen to take them out at any time."
@@ -1589,6 +1701,45 @@ function settingsViewHtml(){
     <p class="small">${LANG === "en" ? aboutEn : aboutJa}</p>
   </div>`;
 }
+/* ============ 第8期：Markdown入力支援 ============ */
+function mdPress(ev, kind){
+  ev.preventDefault();
+  const ta = document.getElementById("edBody");
+  if(!ta) return;
+  const s = ta.selectionStart, e = ta.selectionEnd, v = ta.value;
+  const sel = v.slice(s, e);
+  let out = null, ns = s, ne = e;
+  const wrap = (b, a, ph) => {
+    const inner = sel || ph;
+    out = v.slice(0, s) + b + inner + a + v.slice(e);
+    ns = s + b.length; ne = ns + inner.length;
+  };
+  const prefixLines = (fn) => {
+    const ls = v.lastIndexOf("\n", s - 1) + 1;
+    let le = v.indexOf("\n", e); if(le < 0) le = v.length;
+    const block = v.slice(ls, le);
+    const joined = block.split("\n").map((ln, i) => fn(ln, i)).join("\n");
+    out = v.slice(0, ls) + joined + v.slice(le);
+    ns = ls; ne = ls + joined.length;
+  };
+  if(kind === "bold") wrap("**", "**", LANG === "en" ? "bold text" : "太字");
+  else if(kind === "code"){
+    if(sel.includes("\n")) wrap("```\n", "\n```", "");
+    else wrap("`", "`", LANG === "en" ? "code" : "コード");
+  }
+  else if(kind === "link"){ wrap("[", "](https://)", ""); if(!sel){ ns = s + 1; ne = s + 1; } }
+  else if(kind === "head") prefixLines(ln => ln.startsWith("## ") ? ln.slice(3) : "## " + ln);
+  else if(kind === "list") prefixLines(ln => ln.trim() ? "- " + ln : ln);
+  else if(kind === "numlist") prefixLines((ln, i) => ln.trim() ? (i + 1) + ". " + ln : ln);
+  else if(kind === "quote") prefixLines(ln => ln.trim() ? "> " + ln : ln);
+  else if(kind === "check") prefixLines(ln => ln.trim() ? "- [ ] " + ln : ln);
+  if(out === null) return;
+  editField("body", out);
+  ta.value = out;
+  ta.focus();
+  try{ ta.setSelectionRange(ns, ne); }catch(_){ }
+}
+
 /* ============ 第6期：英訳サポート（選択→下書き→承認で取り込み） ============ */
 let trState = null;
 function openTranslate(){
@@ -1660,6 +1811,67 @@ function trApply(){
   saveTimer = setTimeout(flushSaves, 400);
   trState = null;
   closeModal();
+  if(currentId === n.id) renderEditor();
+  renderNoteList();
+}
+
+/* ============ 第8期：AI「問いかけ」（下書き提示→選んで挿入） ============ */
+let qState = null;
+function openQuestions(){
+  const n = currentId ? getNote(currentId) : null;
+  if(!n) return;
+  if(!aiReady()){
+    openModal(`<h2>${t("q_need_ai")}</h2><p class="small">${t("q_need_ai_desc")}</p>
+    <div class="sheetfoot"><div class="btnrow" style="margin:0;">
+      <button class="btn" onclick="closeModal(); go('settings');">${t("settings_go")}</button>
+      <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+    </div></div>`);
+    return;
+  }
+  qState = { noteId: n.id, items: [], busy: false };
+  renderQuestionsModal();
+}
+function renderQuestionsModal(){
+  const q = qState; if(!q) return;
+  openModal(`<h2>${t("q_title")}</h2>
+  <p class="small">${t("q_desc")}</p>
+  ${q.items.map((it, i) => `<div class="relrow"><div class="grow"><div>${esc(it.text)}</div></div>${it.done ? `<span class="small">${t("q_inserted")}</span>` : `<button class="mini" onclick="qInsert(${i})">${t("q_insert")}</button>`}</div>`).join("")}
+  <div id="qMsg"></div>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0;">
+    <button class="btn" ${q.busy ? "disabled" : ""} onclick="qRun()">${q.busy ? t("q_running") : t("q_run")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function qRun(){
+  const q = qState; if(!q || q.busy) return;
+  const n = getNote(q.noteId); if(!n) return;
+  q.busy = true; renderQuestionsModal();
+  const prompt = "You are a thinking partner for a note writer. Read the following note and propose 3 questions or alternative viewpoints that deepen the writer's thinking. Write each item on its own line, as a question, without numbers, bullets, or any introduction. Write in the same language as the note.\n\nTitle: " + n.fm.title + "\n\n" + n.body.slice(0, 2000);
+  try{
+    const raw = await aiAsk(prompt);
+    q.items = raw.split(/\n+/).map(x => x.replace(/^[-*\u30FB\d.\u3001)\uFF09\s]+/, "").trim()).filter(x => x.length >= 4).slice(0, 5).map(text => ({ text, done: false }));
+  }catch(err){
+    q.busy = false; renderQuestionsModal();
+    const m = document.getElementById("qMsg");
+    if(m) m.innerHTML = `<div class="msg">${esc(t("q_failed") + aiErrText(err))}</div>`;
+    return;
+  }
+  q.busy = false; renderQuestionsModal();
+}
+function qInsert(i){
+  const q = qState; if(!q) return;
+  const it = q.items[i]; if(!it || it.done) return;
+  const n = getNote(q.noteId); if(!n) return;
+  const head = LANG === "en" ? "## Questions" : "## 問いかけ";
+  const base = n.body.replace(/\s*$/, "");
+  n.body = n.body.includes(head)
+    ? base + "\n- " + it.text + "\n"
+    : base + "\n\n" + head + "\n\n- " + it.text + "\n";
+  it.done = true;
+  dirtyIds.add(n.id);
+  if(saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushSaves, 400);
+  renderQuestionsModal();
   if(currentId === n.id) renderEditor();
   renderNoteList();
 }
@@ -1902,7 +2114,7 @@ async function executeProposal(){
   render();
 }
 /* ============ 外部AIへの受け渡し（書き出し／差分つき取り込み） ============ */
-const HANDOFF_HEADER = "<!-- Kairo ノートから書き出したノート集です。各ノートは「<!-- ===== Kairo note ===== -->」の区切りで分かれ、先頭にフロントマター（title/tags/status/created/updated）があります。編集するときは、区切りとフロントマターの形を保ってください。Kairoに取り込むと、titleが一致するノートは差分確認のうえで更新され、一致しないノートは新規として追加されます。 -->";
+const HANDOFF_HEADER = "<!-- Kairo Noteから書き出したノート集です。各ノートは「<!-- ===== Kairo note ===== -->」の区切りで分かれ、先頭にフロントマター（title/tags/status/created/updated）があります。編集するときは、区切りとフロントマターの形を保ってください。Kairoに取り込むと、titleが一致するノートは差分確認のうえで更新され、一致しないノートは新規として追加されます。 -->";
 function exportHandoff(){
   const targets = sortedNotes().filter(n => aiTargets.has(n.id));
   const el = document.getElementById("handoffMsg");
