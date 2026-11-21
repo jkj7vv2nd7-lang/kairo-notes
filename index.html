@@ -73,6 +73,14 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 .preview pre code{ background:none; color:inherit; padding:0; }
 .preview blockquote{ border-left:4px solid var(--teal); margin:10px 0; padding:4px 12px; color:var(--muted); background:#f4f7f5; }
 .preview a{ color:var(--teal-dark); }
+.preview img{ max-width:100%; height:auto; border:1px solid var(--line); border-radius:8px; background:#fff; }
+/* 手書きパッド・音声メモ */
+.inktools{ display:flex; gap:6px; flex-wrap:wrap; margin:10px 0; }
+.inktools button{ flex:1; min-height:46px; border-radius:10px; border:1.5px solid var(--line); background:#fff; font-weight:700; font-size:14px; cursor:pointer; padding:4px; }
+.inktools button.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
+#inkCanvas{ width:100%; height:330px; background:#fff; border:1.5px solid var(--line); border-radius:12px; touch-action:none; display:block; }
+.voicebig{ width:100%; min-height:64px; font-size:19px; border-radius:14px; }
+.rec{ background:var(--danger) !important; border-color:var(--danger) !important; }
 .outline{ font-size:14px; }
 .outline button{ display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px dashed var(--line); padding:7px 4px; font-size:14px; cursor:pointer; color:var(--ink); }
 .outline .lv2{ padding-left:18px; } .outline .lv3{ padding-left:32px; } .outline .lv4{ padding-left:44px; }
@@ -139,7 +147,7 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 <div id="modalRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.0.0";
+const APP_VER = "1.1.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -198,6 +206,14 @@ function parseBlocks(body){
 }
 function inlineMd(s){
   let t = esc(s);
+  t = t.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (m, alt, src) => {
+    if(src.startsWith("kairo-img:")){
+      const url = imgCache[src.slice(10)] || "";
+      return url ? `<img src="${url}" alt="${alt}" loading="lazy">` : `<span class="small">（${alt || "手書き画像"}）</span>`;
+    }
+    if(/^(https:|data:image\/)/.test(src)) return `<img src="${src}" alt="${alt}" loading="lazy">`;
+    return esc(alt);
+  });
   t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
   t = t.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   t = t.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
@@ -226,7 +242,7 @@ function excerptOf(blocks, max){
     else if(b.type === "list") parts.push(b.items.join("、"));
     if(parts.join(" ").length >= (max || 90)) break;
   }
-  return parts.join(" ").replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").slice(0, max || 90);
+  return parts.join(" ").replace(/!\[[^\]]*\]\([^)]*\)/g, "（手書き画像）").replace(/\*\*/g, "").replace(/`/g, "").replace(/\s+/g, " ").slice(0, max || 90);
 }
 /* ============ IndexedDB（ノート実体とアプリ側メタデータ） ============ */
 const DB_NAME = "kairo-notes-v1";
@@ -234,11 +250,12 @@ let dbPromise = null;
 function dbOpen(){
   if(dbPromise) return dbPromise;
   dbPromise = new Promise((res, rej) => {
-    const rq = indexedDB.open(DB_NAME, 1);
+    const rq = indexedDB.open(DB_NAME, 2);
     rq.onupgradeneeded = () => {
       const db = rq.result;
       if(!db.objectStoreNames.contains("notes")) db.createObjectStore("notes", { keyPath: "id" });
       if(!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+      if(!db.objectStoreNames.contains("images")) db.createObjectStore("images", { keyPath: "id" });
     };
     rq.onsuccess = () => res(rq.result);
     rq.onerror = () => rej(rq.error);
@@ -274,6 +291,25 @@ async function metaGet(key, def){
   const r = rows.find(x => x.key === key);
   return r ? r.value : def;
 }
+/* ============ 手書き画像（IndexedDBのimagesストア／本文には参照だけ） ============ */
+let imgCache = {};
+async function loadImgCache(){
+  const rows = await idbAll("images");
+  imgCache = {};
+  rows.forEach(r => { imgCache[r.id] = r.dataUrl; });
+}
+async function saveImage(noteId, dataUrl){
+  const id = uid();
+  await idbPut("images", { id, noteId, dataUrl, created: nowIso() });
+  imgCache[id] = dataUrl;
+  return id;
+}
+async function deleteNoteImages(noteId){
+  const rows = await idbAll("images");
+  for(const r of rows){
+    if(r.noteId === noteId){ await idbDel("images", r.id); delete imgCache[r.id]; }
+  }
+}
 async function metaSet(key, value){ await idbPut("meta", { key, value }); }
 /* ============ 状態とノート操作 ============ */
 let notes = [];           /* {id, fm, body} の配列（正本はnoteToMdで作るMarkdown） */
@@ -303,6 +339,7 @@ async function deleteNote(id){
   notes = notes.filter(n => n.id !== id);
   aiTargets.delete(id); saveAiTargets();
   await idbDel("notes", id);
+  await deleteNoteImages(id);
   if(currentId === id) currentId = null;
 }
 async function replaceAllNotes(list){
@@ -355,7 +392,7 @@ function renderBottom(){
     `<button class="${it.cls || ""} ${view === it.k ? "on" : ""}" onclick="bottomTap('${it.k}')">${it.label}</button>`).join("");
 }
 function bottomTap(k){
-  if(k === "new"){ newNote(); return; }
+  if(k === "new"){ openCreateMenu(); return; }
   go(k);
 }
 async function newNote(){
@@ -467,6 +504,9 @@ function editorHtml(n){
       <button class="btn sub" onclick="exportNote('${n.id}')">⬇ .mdで書き出す</button>
       <button class="btn sub" onclick="duplicateNote('${n.id}')">📄 複製する</button>
       <button class="btn warn" onclick="removeNote('${n.id}')">🗑 削除</button>
+    </div>
+    <div class="btnrow">
+      <button class="btn sub" onclick="openPad('${n.id}')">✍️ 手書きメモをこのノートに追加</button>
     </div>
   </div>
   <div class="card outline">
@@ -612,12 +652,19 @@ function downloadBlob(filename, blob){
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 function safeName(title){ return String(title || "note").replace(/[\\/:*?"<>|]/g, "_").slice(0, 60) || "note"; }
+function mdForExport(n){
+  /* 書き出しでは手書き画像をdata URIで埋め込み、単体ファイルでも見られる形にする */
+  return noteToMd(n).replace(/\]\((kairo-img:[^)\s]+)\)/g, (m, ref) => {
+    const url = imgCache[ref.slice(10)] || "";
+    return "](" + (url || ref) + ")";
+  });
+}
 function exportNote(id){
   const n = getNote(id); if(!n) return;
-  shareOrDownload(safeName(n.fm.title) + ".md", noteToMd(n));
+  shareOrDownload(safeName(n.fm.title) + ".md", mdForExport(n));
 }
 function buildExportAll(){
-  return sortedNotes().map(n => noteToMd(n)).join("\n\n" + BULK_SEP + "\n\n") + "\n";
+  return sortedNotes().map(n => mdForExport(n)).join("\n\n" + BULK_SEP + "\n\n") + "\n";
 }
 function openExportAll(){
   if(!notes.length){ alert("ノートがありません。"); return; }
@@ -897,7 +944,7 @@ function settingsViewHtml(){
   </div>
   <div class="card">
     <h2>ℹ️ このアプリについて</h2>
-    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第1期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計です。</p>
+    <p class="small">Kairo ノート ver ${APP_VER} ― MarkdownノートOS 第2期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。</p>
   </div>`;
 }
 /* ============ AI Librarian（差分プレビュー→承認→実行／ロールバック） ============ */
@@ -1128,6 +1175,395 @@ async function executeProposal(){
   aiNote = chosen.length + "件の整理を実行しました。元に戻したいときは、下のスナップショットからロールバックできます。";
   render();
 }
+/* ============ 作成メニュー（テキスト／手書き／音声） ============ */
+function openCreateMenu(){
+  openModal(`<h2>＋ 新しく作る</h2>
+  <div class="btnrow" style="flex-direction:column;">
+    <button class="btn" onclick="closeModal(); newNote();">📄 テキストのノート</button>
+    <button class="btn sub" onclick="openPad('new')">✍️ 手書きメモ</button>
+    <button class="btn sub" onclick="openVoice()">🎤 音声メモ</button>
+    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+  </div>
+  <p class="small">手書きと音声は、まず下書きとして開きます。保存するかどうかは、内容を見てから決められます。</p>`);
+}
+/* ============ AIに画像を読ませる（文字起こし用） ============ */
+async function aiAskImage(prompt, dataUrl){
+  const p = aiSet.provider, cfg = aiCfg();
+  const model = (cfg.model || "").trim();
+  const b64 = String(dataUrl).split(",")[1] || "";
+  const timeout = p === "ollama" ? 600000 : 120000;
+  if(p === "gemini"){
+    const j = await fetchJsonT("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(cfg.key.trim()), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: "image/jpeg", data: b64 } }] }], generationConfig: { temperature: 0.2 } })
+    }, timeout);
+    const t = j && j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts.map(x => x.text || "").join("");
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  if(p === "claude"){
+    const j = await fetchJsonT("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": cfg.key.trim(), "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model, max_tokens: 4000, messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: "image/jpeg", data: b64 } }, { type: "text", text: prompt }] }] })
+    }, timeout);
+    const t = (j.content || []).map(x => x.text || "").join("");
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  if(p === "ollama"){
+    const base = (cfg.base || "http://localhost:11434").replace(/\/+$/, "");
+    const j = await fetchJsonT(base + "/api/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, stream: false, messages: [{ role: "user", content: prompt, images: [b64] }] })
+    }, timeout);
+    const t = j.message && j.message.content;
+    if(!t) throw new Error("AIの返答が空でした");
+    return t;
+  }
+  const base = p === "compat" ? (cfg.base || "").replace(/\/+$/, "") : "https://api.openai.com/v1";
+  if(!base) throw new Error("ベースURLが未設定です");
+  const j = await fetchJsonT(base + "/chat/completions", {
+    method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + cfg.key.trim() },
+    body: JSON.stringify({ model, temperature: 0.2, messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUrl } }] }] })
+  }, timeout);
+  const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+  if(!t) throw new Error("AIの返答が空でした");
+  return t;
+}
+/* ============ 手書きメモ（ベクターで保持し、画像として保存） ============ */
+let ink = null;
+function openPad(target){
+  ink = { target, strokes: [], cur: null, color: "#26312e", width: 3.2, eraser: false, erasing: false };
+  openModal(`<h2>✍️ 手書きメモ</h2>
+  <div class="inktools">
+    <button id="inkPen" class="on" onclick="inkSetTool(false)">✏️ ペン</button>
+    <button id="inkEra" onclick="inkSetTool(true)">🧽 消しゴム</button>
+    <button onclick="inkUndo()">↩ 1画もどる</button>
+    <button onclick="inkClear()">🗑 全部消す</button>
+  </div>
+  <div class="inktools">
+    <button class="inkc on" onclick="inkSetColor(this, '#26312e')">● 黒</button>
+    <button class="inkc" onclick="inkSetColor(this, '#2456a6')">● 青</button>
+    <button class="inkc" onclick="inkSetColor(this, '#b03a2e')">● 赤</button>
+  </div>
+  <canvas id="inkCanvas"></canvas>
+  <p class="small">指やペンで書けます。保存すると、画像としてノートに入ります（AIキーなしでも使えます）。</p>
+  <div id="inkMsg"></div>
+  <div class="btnrow">
+    ${target === "new"
+      ? `<button class="btn" onclick="inkSaveNew()">📄 新しいノートとして保存</button>`
+      : `<button class="btn" onclick="inkSaveAppend()">📄 このノートに追加する</button>`}
+    ${aiReady()
+      ? `<button class="btn sub" onclick="inkOcr()">🤖 AIで文字起こし</button>`
+      : ``}
+  </div>
+  ${aiReady() ? "" : `<p class="small">AIキーがあると、手書きの文字起こしもできます（設定で有効化）。</p>`}
+  <div id="ocrArea"></div>
+  <div class="btnrow"><button class="btn ghost" onclick="closeInk()">閉じる</button></div>`);
+  initInkCanvas();
+}
+function inkMsg(t){
+  const el = document.getElementById("inkMsg");
+  if(el) el.innerHTML = t ? `<div class="msg">${esc(t)}</div>` : "";
+}
+function initInkCanvas(){
+  const cv = document.getElementById("inkCanvas");
+  if(!cv) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect();
+  cv.width = Math.max(10, Math.round(r.width * dpr));
+  cv.height = Math.round(330 * dpr);
+  cv.dataset.dpr = dpr;
+  inkRedraw();
+  cv.addEventListener("pointerdown", inkDown);
+  cv.addEventListener("pointermove", inkMove);
+  cv.addEventListener("pointerup", inkUp);
+  cv.addEventListener("pointercancel", inkUp);
+}
+function inkPos(e){
+  const cv = document.getElementById("inkCanvas");
+  const r = cv.getBoundingClientRect();
+  const dpr = Number(cv.dataset.dpr || 1);
+  return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr };
+}
+function inkDown(e){
+  if(!ink) return;
+  const cv = document.getElementById("inkCanvas");
+  try{ cv.setPointerCapture(e.pointerId); }catch(err){}
+  const p = inkPos(e);
+  if(ink.eraser){ ink.erasing = true; inkEraseAt(p); return; }
+  ink.cur = { c: ink.color, w: ink.width, pts: [p] };
+  ink.strokes.push(ink.cur);
+  inkRedraw();
+}
+function inkMove(e){
+  if(!ink) return;
+  const p = inkPos(e);
+  if(ink.eraser){
+    if(ink.erasing) inkEraseAt(p);
+    return;
+  }
+  if(!ink.cur) return;
+  const last = ink.cur.pts[ink.cur.pts.length - 1];
+  if(Math.hypot(p.x - last.x, p.y - last.y) >= 2){ ink.cur.pts.push(p); inkRedraw(); }
+}
+function inkUp(){
+  if(!ink) return;
+  ink.cur = null; ink.erasing = false;
+}
+function inkEraseAt(p){
+  const cv = document.getElementById("inkCanvas");
+  const dpr = Number((cv && cv.dataset.dpr) || 1);
+  const R = 16 * dpr;
+  const before = ink.strokes.length;
+  ink.strokes = ink.strokes.filter(s => !s.pts.some(pt => Math.hypot(pt.x - p.x, pt.y - p.y) <= R));
+  if(ink.strokes.length !== before) inkRedraw();
+}
+function inkRedraw(){
+  const cv = document.getElementById("inkCanvas");
+  if(!cv || !ink) return;
+  const ctx = cv.getContext("2d");
+  const dpr = Number(cv.dataset.dpr || 1);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for(const s of ink.strokes){
+    ctx.strokeStyle = s.c;
+    ctx.lineWidth = s.w * dpr;
+    ctx.beginPath();
+    s.pts.forEach((pt, i) => { if(i === 0) ctx.moveTo(pt.x, pt.y); else ctx.lineTo(pt.x, pt.y); });
+    if(s.pts.length === 1) ctx.lineTo(s.pts[0].x + 0.1, s.pts[0].y + 0.1);
+    ctx.stroke();
+  }
+}
+function inkSetTool(eraser){
+  if(!ink) return;
+  ink.eraser = eraser;
+  const p = document.getElementById("inkPen"), e = document.getElementById("inkEra");
+  if(p) p.classList.toggle("on", !eraser);
+  if(e) e.classList.toggle("on", eraser);
+}
+function inkSetColor(btn, color){
+  if(!ink) return;
+  ink.color = color;
+  document.querySelectorAll(".inkc").forEach(b => b.classList.toggle("on", b === btn));
+}
+function inkUndo(){ if(ink){ ink.strokes.pop(); inkRedraw(); } }
+function inkClear(){ if(ink && ink.strokes.length && confirm("手書きを全部消しますか？")){ ink.strokes = []; inkRedraw(); } }
+function inkToDataUrl(){
+  const cv = document.getElementById("inkCanvas");
+  return cv.toDataURL("image/jpeg", 0.88);
+}
+function inkStampTitle(){
+  const d = new Date(); const p = n => String(n).padStart(2, "0");
+  return "手書きメモ " + (d.getMonth() + 1) + "/" + d.getDate() + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+async function inkSaveNew(){
+  if(!ink || !ink.strokes.length){ inkMsg("まだ何も書かれていません。"); return; }
+  const dataUrl = inkToDataUrl();
+  const title = inkStampTitle();
+  const n = await createNote(title, "# " + title + "\n", [], "idea");
+  const imgId = await saveImage(n.id, dataUrl);
+  n.body += "\n![手書きメモ](kairo-img:" + imgId + ")\n";
+  await persistNote(n);
+  currentId = n.id; view = "doc"; edMode = "preview";
+  closeInk(); render();
+}
+async function inkSaveAppend(){
+  if(!ink || !ink.strokes.length){ inkMsg("まだ何も書かれていません。"); return; }
+  const n = getNote(ink.target);
+  if(!n){ inkMsg("追加先のノートが見つかりません。"); return; }
+  const imgId = await saveImage(n.id, inkToDataUrl());
+  n.body = n.body.replace(/\s*$/, "") + "\n\n![手書きメモ](kairo-img:" + imgId + ")\n";
+  await persistNote(n);
+  currentId = n.id; view = "doc"; edMode = "preview";
+  closeInk(); render();
+}
+const OCR_PROMPT = "この画像は手書きメモです。書かれている文字を正確に書き起こし、Markdownの文章として返してください。見出しや箇条書きの構造が読み取れる場合はMarkdownで表してください。説明や前置きは書かず、書き起こした文章だけを返してください。読み取れない部分は無理に補わないでください。";
+async function inkOcr(){
+  if(!ink || !ink.strokes.length){ inkMsg("まだ何も書かれていません。"); return; }
+  if(!aiReady()){ inkMsg("AI設定が未完了です。設定で接続先とキーを確認してください。"); return; }
+  inkMsg("AIが文字起こししています…（少し時間がかかります）");
+  try{
+    const text = await aiAskImage(OCR_PROMPT, inkToDataUrl());
+    inkMsg("");
+    showOcrDraft(text.trim());
+  }catch(e){ inkMsg(aiErrText(e)); }
+}
+function showOcrDraft(text){
+  const area = document.getElementById("ocrArea");
+  if(!area) return;
+  area.innerHTML = `<div class="card" style="margin-top:12px;">
+    <h2>🤖 文字起こしの下書き</h2>
+    <p class="small">AIが読み取った内容です。確認・修正してから保存してください。このままでは保存されません。</p>
+    <label class="flabel">タイトル</label>
+    <input type="text" id="ocrTitle" value="手書きメモ（文字起こし）">
+    <label class="flabel">本文</label>
+    <textarea id="ocrBody" rows="8">${esc(text)}</textarea>
+    <label class="checkrow" style="margin-top:10px;"><input type="checkbox" id="ocrKeepImg" checked><span>元の手書き画像もノートの末尾に付ける</span></label>
+    <div class="btnrow"><button class="btn" onclick="saveOcrDraft()">✓ この内容でノートを作る</button></div>
+  </div>`;
+  area.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function saveOcrDraft(){
+  const titleEl = document.getElementById("ocrTitle");
+  const bodyEl = document.getElementById("ocrBody");
+  const keepEl = document.getElementById("ocrKeepImg");
+  const title = (titleEl && titleEl.value.trim()) || "手書きメモ（文字起こし）";
+  const body = bodyEl ? bodyEl.value : "";
+  const n = await createNote(title, body, [], "idea");
+  if(keepEl && keepEl.checked && ink && ink.strokes.length){
+    const imgId = await saveImage(n.id, inkToDataUrl());
+    n.body = n.body.replace(/\s*$/, "") + "\n\n![手書きメモ](kairo-img:" + imgId + ")\n";
+    await persistNote(n);
+  }
+  currentId = n.id; view = "doc"; edMode = "edit";
+  closeInk(); render();
+}
+function closeInk(){ ink = null; closeModal(); }
+/* ============ 音声メモ（認識が止まっても内容を失わない） ============ */
+let voice = null;
+function openVoice(){
+  voice = { rec: null, active: false, restarts: 0, hadResult: false, structuredFrom: null };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  openModal(`<h2>🎤 音声メモ</h2>
+  <p class="small">${SR ? "話すと、下の欄に文字が入ります。認識が途中で止まっても、入った文字は残ります。いつでも文字で直したり、続きを打ったりできます。" : "このブラウザでは音声認識が使えません。下の欄に文字で入力してください（そのままノートにできます）。"}</p>
+  ${SR ? `<button class="btn voicebig" id="voiceBtn" onclick="voiceToggle()">🎤 話し始める</button>
+  <div id="voiceStatus" class="small" style="margin-top:8px;">待機中</div>
+  <div id="voiceInterim" style="min-height:1.5em; color:var(--teal-dark); font-size:14px;"></div>` : ""}
+  <label class="flabel">メモの内容（いつでも編集できます）</label>
+  <textarea id="voiceText" rows="7" placeholder="ここに話した内容が入ります。直接打っても構いません。"></textarea>
+  <div id="voiceMsg"></div>
+  <div class="btnrow">
+    <button class="btn" onclick="voiceSave()">📄 この内容でノートを作る</button>
+    ${aiReady() ? `<button class="btn sub" onclick="voiceStructure()">🤖 AIでMarkdownに整える</button>` : ""}
+  </div>
+  <div class="btnrow">
+    <button class="btn ghost" id="voiceUndoBtn" style="display:none;" onclick="voiceUndoStructure()">↩ 整える前の文に戻す</button>
+    <button class="btn ghost" onclick="closeVoice()">閉じる</button>
+  </div>`);
+}
+function voiceMsg(t){
+  const el = document.getElementById("voiceMsg");
+  if(el) el.innerHTML = t ? `<div class="msg">${esc(t)}</div>` : "";
+}
+function voiceUiState(){
+  const btn = document.getElementById("voiceBtn");
+  const st = document.getElementById("voiceStatus");
+  if(!btn || !voice) return;
+  if(voice.active){
+    btn.textContent = "⏹ 止める";
+    btn.classList.add("rec");
+    if(st) st.textContent = "聞き取り中…話してください";
+  } else {
+    btn.textContent = "🎤 話し始める";
+    btn.classList.remove("rec");
+    if(st && st.textContent === "聞き取り中…話してください") st.textContent = "止まっています。入った文字は下の欄に残っています。";
+  }
+}
+function voiceToggle(){
+  if(!voice) return;
+  if(voice.active) voiceStop();
+  else voiceStart();
+}
+function voiceStart(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR || !voice) return;
+  const rec = new SR();
+  rec.lang = "ja-JP";
+  rec.interimResults = true;
+  rec.continuous = true;
+  rec.onresult = e => {
+    let interim = "";
+    for(let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i];
+      if(r.isFinal){
+        const ta = document.getElementById("voiceText");
+        if(ta) ta.value += r[0].transcript;
+        if(voice) voice.hadResult = true;
+      } else interim += r[0].transcript;
+    }
+    const iv = document.getElementById("voiceInterim");
+    if(iv) iv.textContent = interim;
+  };
+  rec.onend = () => {
+    if(voice && voice.active){
+      if(voice.hadResult || voice.restarts < 3){
+        voice.restarts = voice.hadResult ? 0 : voice.restarts + 1;
+        voice.hadResult = false;
+        try{ rec.start(); }catch(err){}
+        return;
+      }
+      voice.active = false;
+      voiceUiState();
+    }
+  };
+  rec.onerror = e => {
+    if(voice) voice.active = false;
+    const st = document.getElementById("voiceStatus");
+    if(st) st.textContent = "認識が止まりました。入った文字は下の欄に残っています。もう一度ボタンを押すか、文字で続けてください。";
+    voiceUiState();
+  };
+  voice.rec = rec;
+  voice.active = true;
+  voice.restarts = 0;
+  voice.hadResult = false;
+  try{ rec.start(); }catch(err){}
+  voiceUiState();
+}
+function voiceStop(){
+  if(!voice) return;
+  voice.active = false;
+  if(voice.rec){ try{ voice.rec.stop(); }catch(err){} }
+  voiceUiState();
+}
+async function voiceStructure(){
+  if(!aiReady()){ voiceMsg("AI設定が未完了です。設定で接続先とキーを確認してください。"); return; }
+  const ta = document.getElementById("voiceText");
+  const text = ta ? ta.value.trim() : "";
+  if(!text){ voiceMsg("まず話すか、文字を入力してください。"); return; }
+  voiceMsg("AIがMarkdownに整えています…");
+  try{
+    const out = await aiAsk("次の文章を、内容を変えずにMarkdownで構造化してください。適宜、見出し（##）と箇条書きを使ってください。説明は付けず、構造化した文章だけを返してください。\n\n" + text);
+    if(voice) voice.structuredFrom = ta.value;
+    ta.value = out.trim();
+    const undo = document.getElementById("voiceUndoBtn");
+    if(undo) undo.style.display = "";
+    voiceMsg("AIが整えた案です。確認・修正してから「この内容でノートを作る」を押してください（まだ保存されていません）。");
+  }catch(e){ voiceMsg(aiErrText(e)); }
+}
+function voiceUndoStructure(){
+  const ta = document.getElementById("voiceText");
+  if(ta && voice && voice.structuredFrom != null){
+    ta.value = voice.structuredFrom;
+    voice.structuredFrom = null;
+    const undo = document.getElementById("voiceUndoBtn");
+    if(undo) undo.style.display = "none";
+    voiceMsg("整える前の文に戻しました。");
+  }
+}
+async function voiceSave(){
+  const ta = document.getElementById("voiceText");
+  const text = ta ? ta.value.trim() : "";
+  if(!text){ voiceMsg("内容が空です。話すか、文字を入力してください。"); return; }
+  voiceStop();
+  const firstLine = text.split("\n")[0].replace(/^#+\s*/, "").trim();
+  const d = new Date(); const p = n => String(n).padStart(2, "0");
+  const title = firstLine ? firstLine.slice(0, 30) : ("音声メモ " + (d.getMonth() + 1) + "/" + d.getDate() + " " + p(d.getHours()) + ":" + p(d.getMinutes()));
+  const n = await createNote(title, text, [], "idea");
+  currentId = n.id; view = "doc"; edMode = "edit";
+  voice = null;
+  closeModal(); render();
+}
+function closeVoice(){
+  const ta = document.getElementById("voiceText");
+  const has = ta && ta.value.trim().length > 0;
+  voiceStop();
+  if(has && !confirm("入力した内容は保存されません。閉じますか？")) return;
+  voice = null;
+  closeModal();
+}
 /* ============ 起動 ============ */
 async function boot(){
   document.getElementById("verFoot").textContent = APP_VER;
@@ -1135,6 +1571,7 @@ async function boot(){
   notes = rows.map(r => parseNote(r.id, r.md));
   canvasPos = await metaGet("canvasPos", {});
   await loadSnaps();
+  await loadImgCache();
   const seeded = await metaGet("seeded", false);
   if(!seeded && notes.length === 0) await seedSamples();
   if(notes.length && !currentId) currentId = sortedNotes()[0].id;
