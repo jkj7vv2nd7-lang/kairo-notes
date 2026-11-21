@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kairo ノート ― MarkdownノートOS</title>
 <meta name="description" content="標準Markdownを基盤にした、ローカルファーストのノートアプリ。文書・ボード・キャンバスの3視点と、非破壊のAI整理。">
-<meta name="theme-color" content="#2f6f6a">
+<meta name="theme-color" content="#2e2766">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -15,24 +15,25 @@
 <meta property="og:image" content="og-image.png">
 <style>
 :root{
-  --teal:#2f6f6a; --teal-dark:#245a55; --accent:#e8873a; --bg:#f7f5ef; --card:#fffdf8;
-  --ink:#26312e; --muted:#6d7a75; --line:#ddd5c2; --danger:#b03a2e; --ok:#2e7d4f;
+  --teal:#3d348b; --teal-dark:#2e2766; --accent:#e8a33d; --bg:#f5f3fa; --card:#fffefa;
+  --ink:#28243c; --muted:#6f6a85; --line:#d9d4e8; --danger:#b03a2e; --ok:#2e7d4f;
   --del-bg:#fbe9e4; --add-bg:#e6f4ea;
 }
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
 body{ font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; background:var(--bg); color:var(--ink); font-size:16px; line-height:1.65; }
-header.top{ background:var(--teal); color:#fff; padding:12px 16px; display:flex; align-items:center; gap:10px; position:sticky; top:0; z-index:30; }
-header.top img{ width:38px; height:38px; border-radius:9px; }
-header.top .t{ font-size:20px; font-weight:800; letter-spacing:.02em; }
-header.top .sub{ font-size:12px; opacity:.85; }
+header.top{ background:radial-gradient(420px 200px at 88% -40%, rgba(232,163,61,.38), rgba(232,163,61,0) 60%), radial-gradient(520px 280px at -10% 130%, rgba(140,70,180,.5), rgba(140,70,180,0) 62%), linear-gradient(118deg, #221d54 0%, #3d348b 58%, #5b2a86 100%); color:#fff; padding:13px 16px; display:flex; align-items:center; gap:11px; position:sticky; top:0; z-index:30; border-bottom:3px solid var(--accent); box-shadow:0 4px 18px rgba(34,29,84,.35); }
+header.top img{ width:42px; height:42px; border-radius:10px; border:2px solid rgba(232,163,61,.95); box-shadow:0 2px 10px rgba(0,0,0,.35); }
+header.top .t{ font-size:22px; font-weight:800; letter-spacing:.04em; }
+header.top .t .gold{ color:#f2b95c; }
+header.top .sub{ font-size:12px; opacity:.88; letter-spacing:.02em; }
 header.top .sp{ flex:1; }
 .iconbtn{ background:rgba(255,255,255,.16); color:#fff; border:none; border-radius:10px; font-size:18px; padding:8px 12px; cursor:pointer; }
 main{ padding:14px 14px 110px; max-width:1180px; margin:0 auto; }
 .bottombar{ position:fixed; left:0; right:0; bottom:0; z-index:40; background:#fffdf8; border-top:1px solid var(--line); display:flex; gap:6px; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow:0 -3px 14px rgba(60,50,20,.08); }
 .bottombar button{ flex:1; min-height:54px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; padding:4px 2px; }
 .bottombar button.on{ background:var(--teal); border-color:var(--teal); color:#fff; }
-.bottombar button.new{ background:var(--accent); border-color:var(--accent); color:#fff; }
+.bottombar button.new{ background:linear-gradient(135deg, #f0b95a, #dd9222); border-color:#dd9222; color:#2e2766; }
 .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px; }
 .card h2{ font-size:18px; margin:2px 0 10px; }
 .btn{ display:inline-block; min-height:48px; padding:10px 18px; border-radius:11px; border:1.5px solid var(--teal); background:var(--teal); color:#fff; font-size:16px; font-weight:700; cursor:pointer; }
@@ -50,12 +51,12 @@ label.flabel{ display:block; font-size:13px; font-weight:700; color:var(--muted)
 .hidden{ display:none !important; }
 .chip{ display:inline-block; padding:5px 12px; border-radius:999px; border:1.5px solid var(--line); background:#fff; font-size:13px; font-weight:700; cursor:pointer; margin:0 6px 6px 0; }
 .chip.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
-.tag{ display:inline-block; background:#eef4f2; color:var(--teal-dark); border-radius:6px; padding:1px 8px; font-size:12px; font-weight:700; margin-right:5px; }
+.tag{ display:inline-block; background:#efeafd; color:var(--teal-dark); border-radius:6px; padding:1px 8px; font-size:12px; font-weight:700; margin-right:5px; }
 /* 文書ビュー */
 .docwrap{ display:flex; gap:14px; align-items:flex-start; }
 .notelist{ width:308px; flex:none; }
 .noteitem{ background:var(--card); border:1px solid var(--line); border-radius:12px; padding:11px 12px; margin-bottom:9px; cursor:pointer; }
-.noteitem.on{ border-color:var(--teal); box-shadow:0 0 0 2px rgba(47,111,106,.25); }
+.noteitem.on{ border-color:var(--teal); box-shadow:0 0 0 2px rgba(61,52,139,.28); }
 .noteitem .ttl{ font-weight:800; font-size:16px; }
 .noteitem .meta{ font-size:12px; color:var(--muted); margin-top:3px; }
 .editor{ flex:1; min-width:0; }
@@ -99,13 +100,13 @@ textarea.ed{ min-height:300px; font-family:ui-monospace,Menlo,Consolas,monospace
 .bcard select{ margin-top:8px; padding:6px 8px; font-size:14px; min-height:38px; }
 .bcard.dragging{ opacity:.85; box-shadow:0 10px 24px rgba(40,40,20,.28); z-index:60; position:relative; }
 /* キャンバス */
-.canvaswrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#f3efe3; max-height:70vh; }
-.canvas{ position:relative; width:2300px; height:1500px; background-image:radial-gradient(#cfc7ab 1.2px, transparent 1.3px); background-size:26px 26px; }
+.canvaswrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#efecf7; max-height:70vh; }
+.canvas{ position:relative; width:2300px; height:1500px; background-image:radial-gradient(#c6bfe2 1.2px, transparent 1.3px); background-size:26px 26px; }
 .ccard{ position:absolute; width:238px; background:#fffdf4; border:1.5px solid var(--line); border-radius:12px; padding:11px 12px; box-shadow:0 3px 10px rgba(60,50,20,.10); cursor:grab; touch-action:none; }
 mark{ background:#ffe58a; color:inherit; padding:0 1px; border-radius:2px; }
 .noteitem .excerpt{ font-size:13px; color:var(--muted); margin-top:4px; line-height:1.5; }
-.mapwrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#eef3ee; max-height:70vh; }
-.mapboard{ position:relative; width:1700px; height:1200px; background-image:radial-gradient(#b9c8b9 1.2px, transparent 1.3px); background-size:26px 26px; }
+.mapwrap{ overflow:auto; border:1px solid var(--line); border-radius:14px; background:#eceaf6; max-height:70vh; }
+.mapboard{ position:relative; width:1700px; height:1200px; background-image:radial-gradient(#bcb1de 1.2px, transparent 1.3px); background-size:26px 26px; }
 .mapboard svg{ position:absolute; left:0; top:0; pointer-events:none; }
 .mnode{ position:absolute; display:flex; align-items:center; gap:7px; min-width:76px; min-height:44px; max-width:190px; padding:9px 12px; background:#fffdf4; border:1.5px solid var(--teal); border-radius:999px; box-shadow:0 3px 10px rgba(60,50,20,.12); cursor:grab; touch-action:none; font-size:13.5px; font-weight:700; }
 .mnode .dot{ flex:none; width:11px; height:11px; border-radius:50%; background:var(--accent); }
@@ -147,7 +148,7 @@ footer{ text-align:center; color:var(--muted); font-size:13px; padding:10px 14px
 <header class="top">
   <img src="icon-192.png" alt="">
   <div>
-    <div class="t">Kairo ノート</div>
+    <div class="t">Kairo <span class="gold">ノート</span></div>
     <div class="sub">MarkdownノートOS ― 記録と整理を分断しない</div>
   </div>
   <div class="sp"></div>
@@ -1049,7 +1050,7 @@ function drawMapEdges(){
   svg.innerHTML = mapEdges().map(e => {
     const A = center(e.a), B = center(e.b);
     if(!A || !B) return "";
-    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#7ba58d" stroke-width="2" stroke-opacity="0.75"/>`;
+    return `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#8f83c4" stroke-width="2" stroke-opacity="0.75"/>`;
   }).join("");
 }
 function afterMapRender(){ drawMapEdges(); }
