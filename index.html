@@ -222,6 +222,10 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .waittip{ font-size:13.5px; color:var(--muted); line-height:1.6; min-height:44px; }
 
 #printArea{ display:none; }
+.remindbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:#fdf3e0; border:1px solid #ecd9ac; color:#6b5518; border-radius:10px; padding:8px 10px; font-size:13px; margin-bottom:10px; }
+.tblgrid{ display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; max-width:320px; margin:10px 0; }
+.tblcell{ height:34px; border:1.5px solid var(--line); border-radius:8px; background:#fff; padding:0; cursor:pointer; }
+.tblcell.on{ background:#d9d2f2; border-color:var(--teal); }
 .corrwrap{ position:relative; padding:2px 2px 6px 30px; }
 .corrwrap::before{ content:""; position:absolute; left:11px; top:8px; bottom:8px; width:3px; border-radius:2px; background:linear-gradient(180deg, var(--teal), var(--accent)); opacity:.5; }
 .corrmonth{ position:relative; display:inline-block; background:var(--teal); color:#fff; font-weight:800; font-size:15.5px; padding:6px 14px; border-radius:999px; margin:18px 0 10px; }
@@ -266,7 +270,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.10.0";
+const APP_VER = "1.11.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -390,6 +394,30 @@ const STR = {
   cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
   cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
   book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  tb_table: ["表", "Table"],
+  tbl_title: ["▦ 表を入れる", "▦ Insert a table"], tbl_lead: ["マスをタップして、表の大きさを選んでください。", "Tap the grid to choose the size of the table."],
+  tbl_insert: ["この表を入れる", "Insert this table"],
+  bak_title: ["💾 バックアップと復元", "💾 Backup & restore"],
+  bak_lead: ["全ノートと手書き画像を、1つのファイルに控えます。大切なデータの守りです。", "Save all of your notes and handwriting images into a single file."],
+  bak_export: ["バックアップを書き出す", "Export backup"], bak_import: ["バックアップから復元する", "Restore from a backup"],
+  bak_exported: ["バックアップを書き出しました。", "Backup exported."],
+  bak_safety_label: ["復元前の控え", "Pre-restore safety copy"], bak_safety_btn: ["控えに戻す", "Restore the safety copy"],
+  bak_safety_none: ["控えはまだありません（復元すると、その直前の状態が自動で控えられます）。", "No safety copy yet. One is taken automatically just before a restore."],
+  bak_safety_confirm: ["復元前の控えに戻します。今のデータは、控えの内容に置き換わります。よろしいですか。", "Return to the pre-restore safety copy? Your current data will be replaced by it."],
+  bak_remind: ["大切なノートを守るため、バックアップがおすすめです", "To protect your precious notes, a backup is recommended."],
+  bak_remind_go: ["設定へ", "Open settings"],
+  bak_rs_title: ["バックアップの復元", "Restore a backup"],
+  bak_step1: ["手順 1／2　内容の確認と進み方", "Step 1 of 2 — Check the contents and choose how to restore"],
+  bak_step2: ["手順 2／2　完了", "Step 2 of 2 — Done"],
+  bak_rs_count: ["ノート {n} 件", "{n} notes"], bak_rs_images: ["手書き画像 {n} 枚", "{n} handwriting images"],
+  bak_rs_when: ["書き出し日時", "Exported at"], bak_rs_mode: ["進み方を選んでください", "Choose how to restore"],
+  bak_rs_add: ["今のデータに追加する", "Add to my current data"], bak_rs_replace: ["すべて入れ替える", "Replace everything"],
+  bak_rs_add_note: ["重なるノートは、新しいノートとして取り込みます。今のノートは、そのまま残ります。", "Notes that overlap are imported as new notes. Your current notes stay as they are."],
+  bak_rs_replace_warn: ["今のノート・画像・設定が、バックアップの内容に置き換わります。", "Your current notes, images and settings will be replaced by the contents of the backup."],
+  bak_rs_agree: ["今のデータが置き換わることを理解しました", "I understand that my current data will be replaced"],
+  bak_rs_safety_note: ["どちらの進み方でも、復元の直前に今のデータの控えを自動で取ります。失敗したときは、設定から控えに戻せます。", "Either way, a safety copy of your current data is taken automatically just before restoring. If anything goes wrong, you can return to it from Settings."],
+  bak_rs_run: ["復元する", "Restore"], bak_rs_done: ["復元が終わりました。", "The restore is complete."],
+  bak_rs_failed: ["復元できませんでした", "The restore failed"], bak_rs_invalid: ["バックアップファイルではないようです。書き出したファイルを選び直してください。", "This does not look like a Kairo Note backup file. Please choose the file you exported."],
   tpl_on: ["📐 型に登録", "📐 Save as template"], tpl_off: ["📐 型を解除", "📐 Remove template"],
   tpl_from: ["型から作る", "From a template"],
   tpl_settings_title: ["📐 型（テンプレート）", "📐 Templates"],
@@ -884,6 +912,7 @@ function docViewHtml(){
   const cur = currentId ? getNote(currentId) : null;
   return `<div class="docwrap ${cur ? "editing" : ""}">
     <div class="notelist">
+      ${backupRemindHtml()}
       ${reunionHtml()}
       <div class="card" style="padding:12px;">
         <input type="text" id="searchBox" placeholder="${t("search_ph")}" value="${esc(searchQ)}" oninput="searchQ = this.value; renderNoteList();">
@@ -1052,6 +1081,7 @@ function editorHtml(n){
           <button onpointerdown="mdPress(event, 'code')">&lt;/&gt; ${t("tb_code")}</button>
           <button onpointerdown="mdPress(event, 'date')">📅 ${t("tb_date")}</button>
           <button onpointerdown="mdPress(event, 'time')">🕐 ${t("tb_time")}</button>
+          <button onpointerdown="mdTablePress(event)">▦ ${t("tb_table")}</button>
         </div>
         <textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
       : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
@@ -1960,8 +1990,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -1983,6 +2013,18 @@ function settingsViewHtml(){
     <h2>${t("tpl_settings_title")}</h2>
     <p class="small">${t("tpl_settings_lead")}</p>
     ${templates.length ? templates.map(tp => `<div class="relrow"><div class="relmain"><b>${esc(tp.name)}</b></div><button class="mini warn" onclick="removeTemplate('${tp.tid}')">${t("delete_btn")}</button></div>`).join("") : `<p class="small">${t("tpl_none")}</p>`}
+  </div>
+  <div class="card">
+    <h2>${t("bak_title")}</h2>
+    <p class="small">${t("bak_lead")}</p>
+    <div class="btnrow">
+      <button class="btn" onclick="exportBackup()">${t("bak_export")}</button>
+      <button class="btn sub" onclick="document.getElementById('bakFile').click()">${t("bak_import")}</button>
+    </div>
+    <input type="file" id="bakFile" accept=".json,application/json" style="display:none" onchange="onBackupFile(this)">
+    <div id="bakMsg"></div>
+    <label class="flabel">${t("bak_safety_label")}</label>
+    ${safetyBackupAt ? `<p class="small">🕘 ${esc(fmtDate(safetyBackupAt))}</p><div class="btnrow"><button class="btn sub" onclick="openSafetyRestore()">${t("bak_safety_btn")}</button></div>` : `<p class="small">${t("bak_safety_none")}</p>`}
   </div>
   ${FS_OK ? `<div class="card">
     <h2>${t("folder_title")}</h2>
@@ -2786,6 +2828,290 @@ function sumApplyTitle(i){
   s.msg = t("sum_title_done");
   renderSummaryModal(); renderEditor(); renderNoteList();
 }
+/* ============ バックアップと復元（第12期） ============ */
+let safetyBackupAt = null;
+async function idbClear(store){
+  const db = await dbOpen();
+  return new Promise((res, rej) => {
+    const rq = db.transaction(store, "readwrite").objectStore(store).clear();
+    rq.onsuccess = () => res();
+    rq.onerror = () => rej(rq.error);
+  });
+}
+function shareOrDownloadAs(filename, text, mime){
+  const blob = new Blob([text], { type: mime + ";charset=utf-8" });
+  const file = new File([blob], filename, { type: mime });
+  if(navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share){
+    navigator.share({ files: [file] }).catch(() => downloadBlob(filename, blob));
+  } else downloadBlob(filename, blob);
+}
+async function buildBackupObject(){
+  const noteRows = await idbAll("notes");
+  const imgRows = await idbAll("images");
+  const metaRows = await idbAll("meta");
+  const meta = {};
+  for(const r of metaRows){ if(r.key !== "safetyBackup") meta[r.key] = r.value; }
+  return { app: "Kairo Note", kind: "kairo-note-backup", version: 1, exportedAt: nowIso(), notes: noteRows, images: imgRows, meta };
+}
+async function exportBackup(){
+  const data = await buildBackupObject();
+  const d = new Date();
+  const pad = x => String(x).padStart(2, "0");
+  const name = "kairo-note-backup-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".json";
+  shareOrDownloadAs(name, JSON.stringify(data, null, 2), "application/json");
+  try{ localStorage.setItem("kairo-last-backup", d.toISOString()); }catch(e){ }
+  const m = document.getElementById("bakMsg");
+  if(m) m.innerHTML = `<div class="msg">${t("bak_exported")}</div>`;
+}
+function backupRemindHtml(){
+  if(searchQ || tagFilter) return "";
+  try{
+    const DAY = 86400000, now = Date.now();
+    const last = localStorage.getItem("kairo-last-backup");
+    if(last && (now - new Date(last).getTime()) < 30 * DAY) return "";
+    const closed = localStorage.getItem("kairo-backup-remind-closed");
+    if(closed && (now - new Date(closed).getTime()) < 30 * DAY) return "";
+    return `<div class="remindbar"><span>💾 ${t("bak_remind")}</span><button class="mini" onclick="go('settings')">${t("bak_remind_go")}</button><button class="mini" onclick="closeBackupRemind()">${t("close_btn")}</button></div>`;
+  }catch(e){ return ""; }
+}
+function closeBackupRemind(){
+  try{ localStorage.setItem("kairo-backup-remind-closed", new Date().toISOString()); }catch(e){ }
+  render();
+}
+async function reloadAllData(){
+  const rows = await idbAll("notes");
+  notes = rows.map(r => parseNote(r.id, r.md));
+  canvasPos = await metaGet("canvasPos", {});
+  mapPos = await metaGet("mapPos", {});
+  await loadPins();
+  await loadTemplates();
+  await loadSnaps();
+  for(const k of Object.keys(imgCache)) delete imgCache[k];
+  await loadImgCache();
+  const sb = await metaGet("safetyBackup", null);
+  safetyBackupAt = sb && sb.exportedAt ? sb.exportedAt : null;
+  if(currentId && !getNote(currentId)) currentId = null;
+}
+async function applyBackupReplace(data, safetyToKeep){
+  await idbClear("notes"); await idbClear("images"); await idbClear("meta");
+  for(const row of (data.notes || [])) await idbPut("notes", row);
+  for(const row of (data.images || [])) await idbPut("images", row);
+  const meta = data.meta || {};
+  for(const k of Object.keys(meta)){ if(k !== "safetyBackup") await idbPut("meta", { key: k, value: meta[k] }); }
+  if(safetyToKeep) await idbPut("meta", { key: "safetyBackup", value: safetyToKeep });
+}
+async function applyBackupAdd(data){
+  const meta = data.meta || {};
+  const idMap = {};
+  const existing = new Set(notes.map(n => n.id));
+  for(const row of (data.notes || [])){
+    let nid = row.id;
+    if(existing.has(nid)) nid = uid();
+    existing.add(nid);
+    idMap[row.id] = nid;
+  }
+  const tplMap = {};
+  const newTpls = [];
+  if(Array.isArray(meta.templates)){
+    const haveTpl = new Set(templates.map(x => x.tid));
+    for(const tp of meta.templates){
+      let ntid = tp.tid;
+      if(haveTpl.has(ntid)) ntid = uid();
+      haveTpl.add(ntid);
+      tplMap[tp.tid] = ntid;
+      newTpls.push({ ...tp, tid: ntid, srcId: idMap[tp.srcId] || tp.srcId });
+    }
+  }
+  const imgIdMap = {};
+  const imgIds = new Set((await idbAll("images")).map(r => r.id));
+  for(const row of (data.images || [])){
+    let iid = row.id;
+    if(imgIds.has(iid)) iid = uid();
+    imgIds.add(iid);
+    imgIdMap[row.id] = iid;
+    let owner = row.noteId;
+    if(typeof owner === "string" && owner.startsWith("tpl:")) owner = "tpl:" + (tplMap[owner.slice(4)] || owner.slice(4));
+    else if(idMap[owner]) owner = idMap[owner];
+    await idbPut("images", { id: iid, noteId: owner, dataUrl: row.dataUrl, created: row.created });
+    imgCache[iid] = row.dataUrl;
+  }
+  const remapBody = (body) => {
+    let out = body;
+    for(const oldImg of Object.keys(imgIdMap)){
+      if(imgIdMap[oldImg] !== oldImg) out = out.split("kairo-img:" + oldImg).join("kairo-img:" + imgIdMap[oldImg]);
+    }
+    return out;
+  };
+  for(const row of (data.notes || [])){
+    const nid = idMap[row.id];
+    const parsed = parseNote(nid, row.md);
+    parsed.body = remapBody(parsed.body);
+    notes.push(parsed);
+    await idbPut("notes", { id: nid, md: noteToMd(parsed) });
+  }
+  if(newTpls.length){
+    for(const tp of newTpls) tp.body = remapBody(tp.body || "");
+    templates = templates.concat(newTpls);
+    await metaSet("templates", templates);
+  }
+  if(Array.isArray(meta.pins)){
+    const add = meta.pins.map(p => idMap[p] || p).filter(p => getNote(p) && !pins.includes(p));
+    if(add.length){ pins = pins.concat(add); await metaSet("pins", pins); }
+  }
+  for(const key of ["canvasPos", "mapPos"]){
+    if(meta[key] && typeof meta[key] === "object"){
+      const cur = key === "canvasPos" ? canvasPos : mapPos;
+      let changed = false;
+      for(const oldId of Object.keys(meta[key])){
+        const nid2 = idMap[oldId] || oldId;
+        if(!(nid2 in cur)){ cur[nid2] = meta[key][oldId]; changed = true; }
+      }
+      if(changed) await metaSet(key, cur);
+    }
+  }
+}
+let bakState = null;
+function onBackupFile(input){
+  const f = input.files && input.files[0];
+  input.value = "";
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data = null;
+    try{ data = JSON.parse(String(reader.result)); }catch(e){ }
+    if(!data || data.kind !== "kairo-note-backup" || !Array.isArray(data.notes)){
+      openModal(`<h2>${t("bak_rs_title")}</h2><div class="msg">${t("bak_rs_invalid")}</div><div class="sheetfoot"><div class="btnrow" style="margin:0"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
+      return;
+    }
+    bakState = { data, mode: "", agree: false, stage: "choose", msg: "" };
+    renderRestoreModal();
+  };
+  reader.readAsText(f);
+}
+function bakSetMode(m){ if(bakState){ bakState.mode = m; bakState.agree = false; renderRestoreModal(); } }
+function bakToggleAgree(v){ if(bakState){ bakState.agree = !!v; renderRestoreModal(); } }
+function renderRestoreModal(){
+  const s = bakState; if(!s) return;
+  const d = s.data;
+  if(s.stage === "done"){
+    openModal(`<h2>${t("bak_rs_title")}</h2>
+    <p class="small"><b>${t("bak_step2")}</b></p>
+    <div class="msg">${t("bak_rs_done")} ${t("bak_rs_count").replace("{n}", notes.length)}</div>
+    <div class="sheetfoot"><div class="btnrow" style="margin:0"><button class="btn" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
+    return;
+  }
+  openModal(`<h2>${t("bak_rs_title")}</h2>
+  <p class="small"><b>${t("bak_step1")}</b></p>
+  <div class="card" style="background:var(--bg); margin:8px 0;">
+    <div>📄 ${t("bak_rs_count").replace("{n}", (d.notes || []).length)}</div>
+    <div>✍️ ${t("bak_rs_images").replace("{n}", (d.images || []).length)}</div>
+    <div>🕘 ${t("bak_rs_when")}：${d.exportedAt ? esc(fmtDate(d.exportedAt)) : "—"}</div>
+  </div>
+  <label class="flabel">${t("bak_rs_mode")}</label>
+  <div class="seg2">
+    <button class="${s.mode === "add" ? "on" : ""}" onclick="bakSetMode('add')">${t("bak_rs_add")}</button>
+    <button class="${s.mode === "replace" ? "on" : ""}" onclick="bakSetMode('replace')">${t("bak_rs_replace")}</button>
+  </div>
+  ${s.mode === "add" ? `<p class="small">${t("bak_rs_add_note")}</p>` : ""}
+  ${s.mode === "replace" ? `<p class="small" style="color:#a33"><b>${t("bak_rs_replace_warn")}</b></p>
+  <label class="small" style="display:flex; gap:8px; align-items:center; margin:8px 0;"><input type="checkbox" ${s.agree ? "checked" : ""} onchange="bakToggleAgree(this.checked)" style="width:22px; height:22px;"> ${t("bak_rs_agree")}</label>` : ""}
+  <p class="small">${t("bak_rs_safety_note")}</p>
+  ${s.msg ? `<div class="msg">${esc(s.msg)}</div>` : ""}
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="bakRunRestore()" ${(!s.mode || (s.mode === "replace" && !s.agree)) ? "disabled" : ""}>${t("bak_rs_run")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function bakRunRestore(){
+  const s = bakState; if(!s || !s.mode) return;
+  if(s.mode === "replace" && !s.agree) return;
+  try{
+    const safety = await buildBackupObject();
+    if(s.mode === "replace"){
+      await applyBackupReplace(s.data, safety);
+    }else{
+      await metaSet("safetyBackup", safety);
+      await applyBackupAdd(s.data);
+    }
+    safetyBackupAt = safety.exportedAt;
+    await reloadAllData();
+    s.stage = "done";
+    renderRestoreModal();
+    render();
+  }catch(e){
+    s.msg = t("bak_rs_failed") + "：" + (e && e.message ? e.message : String(e));
+    renderRestoreModal();
+  }
+}
+function openSafetyRestore(){
+  openModal(`<h2>${t("bak_safety_label")}</h2>
+  <p class="small">${t("bak_safety_confirm")}</p>
+  <p class="small">🕘 ${safetyBackupAt ? esc(fmtDate(safetyBackupAt)) : ""}</p>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn warn" onclick="doRestoreSafety()">${t("bak_safety_btn")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function doRestoreSafety(){
+  const s = await metaGet("safetyBackup", null);
+  if(!s){ closeModal(); return; }
+  await applyBackupReplace(s, s);
+  await reloadAllData();
+  closeModal();
+  render();
+}
+/* ============ 表の挿入（第12期） ============ */
+let tblState = { rows: 2, cols: 3, s: 0, e: 0 };
+function mdTablePress(ev){
+  ev.preventDefault();
+  const ta = document.getElementById("edBody");
+  tblState = { rows: 2, cols: 3, s: ta ? ta.selectionStart : 0, e: ta ? ta.selectionEnd : 0 };
+  renderTableModal();
+}
+function tblPick(r, c){ tblState.rows = r; tblState.cols = c; renderTableModal(); }
+function tblSizeLabel(){
+  return LANG === "ja"
+    ? "表の大きさ：" + tblState.cols + "列 × " + (tblState.rows + 1) + "行（見出し行を含みます）"
+    : "Table size: " + tblState.cols + " columns × " + (tblState.rows + 1) + " rows (including the header)";
+}
+function renderTableModal(){
+  let cells = "";
+  for(let r = 0; r < 6; r++){
+    for(let c = 0; c < 6; c++){
+      const on = r < tblState.rows && c < tblState.cols;
+      cells += `<button class="tblcell ${on ? "on" : ""}" onclick="tblPick(${r + 1}, ${c + 1})" aria-label="${r + 1} x ${c + 1}"></button>`;
+    }
+  }
+  openModal(`<h2>${t("tbl_title")}</h2>
+  <p class="small">${t("tbl_lead")}</p>
+  <div class="tblgrid">${cells}</div>
+  <p class="small">${tblSizeLabel()}</p>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="tblInsert()">${t("tbl_insert")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+function tblInsert(){
+  const ta = document.getElementById("edBody");
+  if(!ta){ closeModal(); return; }
+  const cols = tblState.cols, rows = tblState.rows;
+  const head = "|" + "  |".repeat(cols);
+  const sep = "|" + " --- |".repeat(cols);
+  const lines = [head, sep];
+  for(let i = 0; i < rows; i++) lines.push(head);
+  const table = lines.join("\n");
+  const v = ta.value;
+  const s = Math.min(tblState.s, v.length), e = Math.min(tblState.e, v.length);
+  const before = v.slice(0, s), after = v.slice(e);
+  const pre = before && !before.endsWith("\n") ? "\n" : "";
+  const post = after && !after.startsWith("\n") ? "\n" : "";
+  const out = before + pre + table + post + after;
+  editField("body", out);
+  closeModal();
+  renderEditor();
+  const ta2 = document.getElementById("edBody");
+  if(ta2){ ta2.focus(); const pos = (before + pre + table).length; try{ ta2.setSelectionRange(pos, pos); }catch(_){ } }
+}
 function openCreateMenu(){
   openModal(`<h2>${t("create_title")}</h2>
   <div class="btnrow" style="flex-direction:column;">
@@ -3194,6 +3520,8 @@ async function boot(){
   mapPos = await metaGet("mapPos", {});
   await loadPins();
   await loadTemplates();
+  const sb0 = await metaGet("safetyBackup", null);
+  safetyBackupAt = sb0 && sb0.exportedAt ? sb0.exportedAt : null;
   applyFs();
   applyStaticLang();
   await loadSnaps();
