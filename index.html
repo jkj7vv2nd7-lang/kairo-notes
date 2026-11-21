@@ -165,6 +165,24 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .seg2{ display:inline-flex; border:1.5px solid var(--line); border-radius:999px; overflow:hidden; }
 .seg2 button{ border:0; background:#fff; padding:9px 16px; font-size:15px; font-weight:700; color:var(--ink); cursor:pointer; min-height:44px; }
 .seg2 button.on{ background:var(--teal); color:#fff; }
+
+/* 第7期：広い画面の上部ナビ */
+.topnav{ display:none; }
+.topnav button{ position:relative; min-height:44px; padding:8px 13px; border-radius:11px; border:1.5px solid rgba(255,255,255,.35); background:rgba(255,255,255,.13); color:#fff; font-size:14.5px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.topnav button:hover{ background:rgba(255,255,255,.24); }
+.topnav button.on{ background:var(--accent); border-color:var(--accent); color:#2e2766; }
+.topnav button.new{ background:linear-gradient(135deg, #f0b95a, #dd9222); border-color:#dd9222; color:#2e2766; }
+.topnav button::after{ content:attr(data-tip); position:absolute; top:calc(100% + 9px); left:50%; transform:translateX(-50%) translateY(2px); background:#28243c; color:#fff; font-size:12.5px; font-weight:400; line-height:1.5; padding:7px 11px; border-radius:9px; width:max-content; max-width:250px; white-space:normal; text-align:left; opacity:0; pointer-events:none; transition:opacity .15s ease, transform .15s ease; z-index:70; box-shadow:0 8px 22px rgba(20,16,50,.35); }
+.topnav button:hover::after, .topnav button:focus-visible::after{ opacity:1; transform:translateX(-50%) translateY(0); }
+.topnav button:nth-last-child(-n+2)::after{ left:auto; right:0; transform:translateY(2px); }
+.topnav button:nth-last-child(-n+2):hover::after, .topnav button:nth-last-child(-n+2):focus-visible::after{ transform:translateY(0); }
+@media (min-width:768px){
+  .topnav{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .bottombar{ display:none; }
+  #hdrSettings{ display:none; }
+  main{ padding-bottom:24px; }
+  footer{ padding-bottom:16px; }
+}
 </style>
 </head>
 <body>
@@ -175,6 +193,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
     <div class="sub" id="hdrTag">MarkdownノートOS ― 記録と整理を分断しない</div>
   </div>
   <div class="sp"></div>
+  <nav class="topnav" id="topnav" aria-label="menu"></nav>
   <button class="iconbtn" id="hdrSettings" onclick="go('settings')" aria-label="設定">⚙ 設定</button>
 </header>
 <main id="app"></main>
@@ -187,7 +206,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="focusRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.5.0";
+const APP_VER = "1.6.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -292,7 +311,14 @@ const STR = {
   tr_run: ["英訳する", "Translate"], tr_running: ["英訳しています…", "Translating…"],
   tr_draft_label: ["英訳の下書き（取り込む前に直せます）", "Translation draft (editable before applying)"],
   tr_apply: ["本文に取り込む", "Apply to text"], tr_failed: ["英訳できませんでした：", "Translation failed: "],
-  settings_go: ["⚙ 設定を開く", "⚙ Open Settings"]
+  settings_go: ["⚙ 設定を開く", "⚙ Open Settings"],
+  tip_new: ["新しいノートを作ります（テキスト・手書き・音声）", "Create a new note (text, handwriting, or voice)"],
+  tip_doc: ["ノートの一覧と編集。書く・直す・探す場所です", "List and edit your notes — where you write, revise, and search"],
+  tip_board: ["状態（アイデア／進行中／完了／保管）ごとにカードで並べます", "Cards grouped by status (Idea / In progress / Done / Archived)"],
+  tip_canvas: ["カードを自由な位置に置いて眺められます", "Arrange cards freely on a board"],
+  tip_map: ["ノート同士のリンクを地図で見ます", "See how your notes link to each other, as a map"],
+  tip_ai: ["AIに整理案を作らせる場所（任意・差分確認つき）", "Ask AI to propose organization (optional, diff-reviewed)"],
+  tip_settings: ["AI接続・表示と言語・文字サイズなどの設定", "AI connection, language, text size, and more"]
 };
 function t(k){ const e = STR[k]; if(!e) return k; return LANG === "en" ? (e[1] || e[0]) : e[0]; }
 function statusLabel(s){ return t("st_" + (STATUS_KEYS.includes(s) ? s : "idea")); }
@@ -641,8 +667,34 @@ async function newNote(){
   const t = document.getElementById("edTitle");
   if(t){ t.focus(); t.select(); }
 }
+function renderTopNav(){
+  const nav = document.getElementById("topnav");
+  if(!nav) return;
+  const wide = window.matchMedia && window.matchMedia("(min-width: 768px)").matches;
+  if(!wide){ nav.innerHTML = ""; return; }
+  const items = [
+    { k: "new", label: t("nav_new"), tip: t("tip_new"), cls: "new" },
+    { k: "doc", label: t("nav_doc"), tip: t("tip_doc") },
+    { k: "board", label: t("nav_board"), tip: t("tip_board") },
+    { k: "canvas", label: t("nav_canvas"), tip: t("tip_canvas") },
+    { k: "map", label: t("nav_map"), tip: t("tip_map") },
+    { k: "ai", label: t("nav_ai"), tip: t("tip_ai") },
+    { k: "settings", label: t("settings_btn"), tip: t("tip_settings") }
+  ];
+  nav.innerHTML = items.map(it =>
+    `<button class="${it.cls || ""} ${view === it.k ? "on" : ""}" data-tip="${esc(it.tip)}" onclick="topNavTap('${it.k}')">${it.label}</button>`).join("");
+}
+function topNavTap(k){
+  if(k === "new"){ openCreateMenu(); return; }
+  go(k);
+}
+if(window.matchMedia){
+  const mq7 = window.matchMedia("(min-width: 768px)");
+  if(mq7.addEventListener) mq7.addEventListener("change", () => renderTopNav());
+}
 function render(){
   renderBottom();
+  renderTopNav();
   const app = $("#app");
   if(view === "doc") app.innerHTML = docViewHtml();
   else if(view === "board") app.innerHTML = boardViewHtml();
@@ -1495,8 +1547,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo ノート ver " + APP_VER + " ― MarkdownノートOS 第6期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。";
-  const aboutEn = "Kairo Notes ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first).";
+  const aboutJa = "Kairo ノート ver " + APP_VER + " ― MarkdownノートOS 第7期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。";
+  const aboutEn = "Kairo Notes ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets).";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
