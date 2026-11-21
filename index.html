@@ -213,6 +213,13 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
   .brandanim .bl, .brandanim .bn{ animation:none !important; }
   .brandanim .bl{ stroke-dashoffset:0; opacity:1; }
 }
+
+.waitwrap{ position:fixed; inset:0; background:rgba(30,25,60,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px; }
+.waitcard{ background:var(--card); border-radius:18px; padding:26px 22px 20px; max-width:340px; width:100%; text-align:center; box-shadow:0 18px 44px rgba(20,16,50,.35); display:flex; flex-direction:column; align-items:center; gap:12px; }
+.waitcard .brandanim{ width:96px; height:auto; }
+.waitcard .brandanim .bn{ fill:#efeafd; }
+.waittitle{ font-size:17px; font-weight:700; }
+.waittip{ font-size:13.5px; color:var(--muted); line-height:1.6; min-height:44px; }
 </style>
 </head>
 <body>
@@ -234,9 +241,10 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <nav class="bottombar" id="bottombar"></nav>
 <div id="modalRoot"></div>
 <div id="focusRoot"></div>
+<div id="waitRoot"></div>
 <script>
 "use strict";
-const APP_VER = "1.7.0";
+const APP_VER = "1.7.1";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -356,6 +364,11 @@ const STR = {
   q_need_ai: ["問いかけにはAI接続が必要です", "Questions need an AI connection"],
   q_need_ai_desc: ["AI「問いかけ」は任意機能です。設定でAI接続をONにして、ご自身のAPIキー（またはOllama）を設定すると使えます。キーはこの端末の中にだけ保存されます。", "Questions are optional. Turn on the AI connection in Settings with your own API key (or Ollama) to use them. Keys are stored only on this device."],
   q_failed: ["問いかけを作れませんでした：", "Could not create questions: "],
+  wait_title: ["考え中…", "Thinking…"], wait_unit: ["秒", "s"], wait_cancel: ["やめる", "Cancel"], wait_stopped: ["やめました", "Stopped"],
+  wait_tips: [
+    ["[[ノート名]] と書くと、ノート同士がリンクでつながります", "ピンを付けたノートは、一覧の先頭に固定されます", "マップでは、ノートのつながりを地図のように眺められます", "集中モードでは、1つのノートだけを大きく表示して書けます", "編集したノートには「履歴」が残り、前の形に戻せます", "一覧の並び替えは、更新順・作成順・タイトル順から選べます", "本文の上に、太字や見出しを付ける入力支援ボタンがあります", "「今日の再会」には、しばらく開いていないノートが日替わりで出ます", "手書きメモや音声メモも作れます（＋新規から）"],
+    ["Type [[Note title]] to link notes together", "Pinned notes stay at the top of the list", "The map shows how your notes connect, like a chart", "Focus mode shows one note, large, for writing", "Every edit keeps a history, so you can go back", "Sort the list by updated, created, or title", "Helper buttons above the text add bold, headings, and more", "Rediscover brings back notes you have not opened for a while", "You can also add handwriting and voice notes (from + New)"]
+  ],
   settings_go: ["⚙ 設定を開く", "⚙ Open Settings"],
   tip_new: ["新しいノートを作ります（テキスト・手書き・音声）", "Create a new note (text, handwriting, or voice)"],
   tip_doc: ["ノートの一覧と編集。書く・直す・探す場所です", "List and edit your notes — where you write, revise, and search"],
@@ -1567,9 +1580,12 @@ function aiReadForm(){
   const b = document.getElementById("aiBase"); if(b) aiCfg().base = b.value;
 }
 function aiFormChanged(){ aiReadForm(); aiSave(); }
+let aiExtSignal = null;
 async function fetchJsonT(url, opts, timeoutMs){
   const ctl = new AbortController();
   const to = setTimeout(() => ctl.abort(), timeoutMs || 120000);
+  const onExt = () => ctl.abort();
+  if(aiExtSignal){ if(aiExtSignal.aborted) ctl.abort(); else aiExtSignal.addEventListener("abort", onExt); }
   try{
     const r = await fetch(url, Object.assign({}, opts, { signal: ctl.signal }));
     const text = await r.text();
@@ -1577,8 +1593,51 @@ async function fetchJsonT(url, opts, timeoutMs){
     try{ json = JSON.parse(text); }catch(e){}
     if(!r.ok) throw new Error("HTTP " + r.status + (json && json.error && json.error.message ? "：" + json.error.message : ""));
     return json;
-  } finally { clearTimeout(to); }
+  } finally { clearTimeout(to); if(aiExtSignal) aiExtSignal.removeEventListener("abort", onExt); }
 }
+/* ---- AI待ち画面（共通） ---- */
+const BRAND_SVG = `<svg class="brandanim" viewBox="0 0 48 34" aria-hidden="true"><line class="bl" x1="10" y1="24" x2="24" y2="9" pathLength="100"/><line class="bl bl2" x1="24" y1="9" x2="38" y2="21" pathLength="100"/><line class="bl bl3" x1="10" y1="24" x2="38" y2="21" pathLength="100"/><circle class="bn" cx="10" cy="24" r="3.4"/><circle class="bn bn2" cx="24" cy="9" r="3.4"/><circle class="bn bn3" cx="38" cy="21" r="3.4"/></svg>`;
+let aiWait = null;
+function startAiWait(){
+  stopAiWait();
+  const w = { ctl: new AbortController(), cancelled: false, showTimer: null, tick: null, startedAt: Date.now() };
+  aiWait = w;
+  aiExtSignal = w.ctl.signal;
+  w.showTimer = setTimeout(() => { if(aiWait === w) renderAiWait(w); }, 350);
+  return w;
+}
+function renderAiWait(w){
+  const root = document.getElementById("waitRoot");
+  if(!root) return;
+  root.innerHTML = `<div class="waitwrap"><div class="waitcard">${BRAND_SVG}<div class="waittitle" id="waitTitle"></div><div class="waittip" id="waitTip"></div><button class="btn ghost" onclick="cancelAiWait()">${t("wait_cancel")}</button></div></div>`;
+  const draw = () => {
+    const s = Math.floor((Date.now() - w.startedAt) / 1000);
+    const title = document.getElementById("waitTitle");
+    if(title) title.textContent = t("wait_title") + " " + s + t("wait_unit");
+    const tips = t("wait_tips");
+    const tip = document.getElementById("waitTip");
+    if(tip && Array.isArray(tips)) tip.textContent = tips[Math.floor(s / 4) % tips.length];
+  };
+  draw();
+  w.tick = setInterval(draw, 250);
+}
+function cancelAiWait(){
+  if(!aiWait) return;
+  aiWait.cancelled = true;
+  try{ aiWait.ctl.abort(); }catch(e){}
+  stopAiWait();
+}
+function stopAiWait(){
+  if(!aiWait) return;
+  const w = aiWait;
+  aiWait = null;
+  if(w.showTimer) clearTimeout(w.showTimer);
+  if(w.tick) clearInterval(w.tick);
+  if(aiExtSignal === w.ctl.signal) aiExtSignal = null;
+  const root = document.getElementById("waitRoot");
+  if(root) root.innerHTML = "";
+}
+function aiWaitCancelled(w){ return !!(w && w.cancelled); }
 function aiErrText(e){
   const m = String((e && e.message) || e || "");
   if((e && e.name === "AbortError") || m.includes("aborted")){
@@ -1653,8 +1712,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick).";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -1789,14 +1848,17 @@ async function trRun(){
     ? "Use a polite, academic style suitable for a paper or a formal report."
     : "Use a natural, plain style.";
   const prompt = "Translate the following Japanese text into English. " + style + " Output only the translation, without any explanation or quotation marks.\n\n" + tr.text;
+  const w = startAiWait();
   try{
     tr.draft = (await aiAsk(prompt)).trim();
   }catch(err){
+    stopAiWait();
     tr.busy = false; renderTranslateModal();
     const m = document.getElementById("trMsg");
-    if(m) m.innerHTML = `<div class="msg">${esc(t("tr_failed") + aiErrText(err))}</div>`;
+    if(m) m.innerHTML = `<div class="msg">${esc(aiWaitCancelled(w) ? t("wait_stopped") : t("tr_failed") + aiErrText(err))}</div>`;
     return;
   }
+  stopAiWait();
   tr.busy = false; renderTranslateModal();
 }
 function trApply(){
@@ -1847,15 +1909,18 @@ async function qRun(){
   const n = getNote(q.noteId); if(!n) return;
   q.busy = true; renderQuestionsModal();
   const prompt = "You are a thinking partner for a note writer. Read the following note and propose 3 questions or alternative viewpoints that deepen the writer's thinking. Write each item on its own line, as a question, without numbers, bullets, or any introduction. Write in the same language as the note.\n\nTitle: " + n.fm.title + "\n\n" + n.body.slice(0, 2000);
+  const w = startAiWait();
   try{
     const raw = await aiAsk(prompt);
     q.items = raw.split(/\n+/).map(x => x.replace(/^[-*\u30FB\d.\u3001)\uFF09\s]+/, "").trim()).filter(x => x.length >= 4).slice(0, 5).map(text => ({ text, done: false }));
   }catch(err){
+    stopAiWait();
     q.busy = false; renderQuestionsModal();
     const m = document.getElementById("qMsg");
-    if(m) m.innerHTML = `<div class="msg">${esc(t("q_failed") + aiErrText(err))}</div>`;
+    if(m) m.innerHTML = `<div class="msg">${esc(aiWaitCancelled(w) ? t("wait_stopped") : t("q_failed") + aiErrText(err))}</div>`;
     return;
   }
+  stopAiWait();
   q.busy = false; renderQuestionsModal();
 }
 function qInsert(i){
@@ -1976,11 +2041,13 @@ async function runLibrarian(){
   const targets = notes.filter(n => aiTargets.has(n.id));
   if(!targets.length){ aiNote = "対象のノートにチェックを入れてください。"; render(); return; }
   aiBusy = true; aiNote = ""; render();
+  const w = startAiWait();
   try{
     const text = await aiAsk(buildPrompt(instruction, targets));
     proposal = parseProposal(text);
     aiNote = "整理案ができました。下の差分プレビューで確認してください。まだ何も変更されていません。";
-  }catch(e){ aiNote = aiErrText(e); }
+  }catch(e){ aiNote = aiWaitCancelled(w) ? t("wait_stopped") : aiErrText(e); }
+  stopAiWait();
   aiBusy = false;
   render();
 }
@@ -2516,11 +2583,13 @@ async function inkOcr(){
   if(!ink || !ink.strokes.length){ inkMsg("まだ何も書かれていません。"); return; }
   if(!aiReady()){ inkMsg("AI設定が未完了です。設定で接続先とキーを確認してください。"); return; }
   inkMsg("AIが文字起こししています…（少し時間がかかります）");
+  const w = startAiWait();
   try{
     const text = await aiAskImage(OCR_PROMPT, inkToDataUrl());
+    stopAiWait();
     inkMsg("");
     showOcrDraft(text.trim());
-  }catch(e){ inkMsg(aiErrText(e)); }
+  }catch(e){ stopAiWait(); inkMsg(aiWaitCancelled(w) ? t("wait_stopped") : aiErrText(e)); }
 }
 function showOcrDraft(text){
   const area = document.getElementById("ocrArea");
@@ -2659,14 +2728,16 @@ async function voiceStructure(){
   const text = ta ? ta.value.trim() : "";
   if(!text){ voiceMsg("まず話すか、文字を入力してください。"); return; }
   voiceMsg("AIがMarkdownに整えています…");
+  const w = startAiWait();
   try{
     const out = await aiAsk("次の文章を、内容を変えずにMarkdownで構造化してください。適宜、見出し（##）と箇条書きを使ってください。説明は付けず、構造化した文章だけを返してください。\n\n" + text);
     if(voice) voice.structuredFrom = ta.value;
     ta.value = out.trim();
     const undo = document.getElementById("voiceUndoBtn");
     if(undo) undo.style.display = "";
+    stopAiWait();
     voiceMsg("AIが整えた案です。確認・修正してから「この内容でノートを作る」を押してください（まだ保存されていません）。");
-  }catch(e){ voiceMsg(aiErrText(e)); }
+  }catch(e){ stopAiWait(); voiceMsg(aiWaitCancelled(w) ? t("wait_stopped") : aiErrText(e)); }
 }
 function voiceUndoStructure(){
   const ta = document.getElementById("voiceText");
