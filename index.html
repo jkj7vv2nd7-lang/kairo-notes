@@ -226,6 +226,9 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .tblgrid{ display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; max-width:320px; margin:10px 0; }
 .tblcell{ height:34px; border:1.5px solid var(--line); border-radius:8px; background:#fff; padding:0; cursor:pointer; }
 .tblcell.on{ background:#d9d2f2; border-color:var(--teal); }
+.tbltools{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; }
+.tbltools button{ min-height:40px; padding:4px 10px; border-radius:9px; border:1.5px solid var(--line); background:#efeafd; color:var(--ink); font-size:13px; font-weight:700; cursor:pointer; }
+.tbltools button:disabled{ opacity:.38; cursor:default; }
 .corrwrap{ position:relative; padding:2px 2px 6px 30px; }
 .corrwrap::before{ content:""; position:absolute; left:11px; top:8px; bottom:8px; width:3px; border-radius:2px; background:linear-gradient(180deg, var(--teal), var(--accent)); opacity:.5; }
 .corrmonth{ position:relative; display:inline-block; background:var(--teal); color:#fff; font-weight:800; font-size:15.5px; padding:6px 14px; border-radius:999px; margin:18px 0 10px; }
@@ -270,7 +273,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.12.0";
+const APP_VER = "1.13.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -394,6 +397,22 @@ const STR = {
   cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
   cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
   book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  today_btn: ["📅 今日のノート", "📅 Today's note"],
+  split_btn: ["✂️ 見出しで分割", "✂️ Split by headings"], split_title: ["✂️ 見出しで分割", "✂️ Split by headings"],
+  split_lead: ["レベル2の見出し（##）ごとに、新しいノートを作ります。元のノートはそのまま残ります。", "A new note is made for each level-2 heading (##). The original note stays as it is."],
+  split_lines: ["本文 {n} 行", "{n} lines of body"], split_run: ["{n} 件に分割する", "Split into {n} notes"],
+  split_none: ["レベル2の見出し（##）が見つかりませんでした。見出しのあるノートでお試しください。", "No level-2 headings (##) were found in this note."],
+  split_done: ["{n} 件の新しいノートを作りました。元のノートはそのまま残っています。", "Made {n} new notes. The original note is unchanged."],
+  merge_btn: ["🧩 結合", "🧩 Merge"], merge_title: ["🧩 ノートを結合", "🧩 Merge notes"],
+  merge_lead: ["選んだ順に、各ノートを見出しつきの節として並べた、新しいノートを作ります。元のノートは変更されません。", "A new note is made with the selected notes as sections, in the order you picked them. The originals never change."],
+  merge_name: ["結合ノートの名前", "Name of the merged note"], merge_name_ph: ["（空なら「まとめノート」になります）", "(Empty uses a default name)"],
+  merge_default_title: ["まとめノート", "Merged notes"],
+  merge_selected: ["{n} 件のノートを選択中（この順に並びます）", "{n} notes selected (in this order)"],
+  merge_run: ["1つのノートにまとめる", "Merge into one note"],
+  tt_row_up: ["⬆ 行を追加", "⬆ Row above"], tt_row_down: ["⬇ 行を追加", "⬇ Row below"],
+  tt_col_left: ["⬅ 列を追加", "⬅ Column left"], tt_col_right: ["列を追加 ➡", "Column right ➡"],
+  tt_del_row: ["今の行を削除", "Delete row"], tt_del_col: ["今の列を削除", "Delete column"],
+  peek_btn: ["👀 のぞく", "👀 Peek"], peek_open: ["このノートを開く", "Open this note"],
   spk_btn: ["🔊 読み上げ", "🔊 Read aloud"], spk_stop: ["⏹ 止める", "⏹ Stop"],
   con_title: ["📚 複数ノートでAI相談", "📚 Ask the AI about several notes"],
   con_lead: ["ノートを複数選んで、AIにまとめや問いかけの下書きを作らせることができます。結果は、新しいノートとして保存したときだけ残ります。元のノートは変わりません。", "Pick several notes and let the AI draft a combined summary or questions. It is kept only when you save it as a new note. The original notes never change."],
@@ -935,6 +954,8 @@ function docViewHtml(){
           <button class="btn sub" onclick="openImport()">${t("import_btn")}</button>
           <button class="btn sub" onclick="openExportAll()">${t("export_all_btn")}</button>
           <button class="btn sub" onclick="openCompile()">${t("cmp_btn")}</button>
+          <button class="btn sub" onclick="openTodayNote()">${t("today_btn")}</button>
+          <button class="btn sub" onclick="openMerge()">${t("merge_btn")}</button>
         </div>
         <div class="sortrow">
           <label class="small" for="sortSel">${t("sort_label")}</label>
@@ -1095,7 +1116,8 @@ function editorHtml(n){
           <button onpointerdown="mdPress(event, 'time')">🕐 ${t("tb_time")}</button>
           <button onpointerdown="mdTablePress(event)">▦ ${t("tb_table")}</button>
         </div>
-        <textarea class="ed" id="edBody" oninput="editField('body', this.value)" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
+        <div id="tblTools"></div>
+        <textarea class="ed" id="edBody" oninput="editField('body', this.value); tblToolsUpdate();" onclick="tblToolsUpdate()" onkeyup="tblToolsUpdate()" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
       : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
     <div class="small" style="margin-top:8px;">${t("autosave")} ／ ${t("updated")} ${fmtDate(n.fm.updated)}</div>
     <div class="btnrow">
@@ -1116,6 +1138,7 @@ function editorHtml(n){
       <button class="btn sub" onclick="toggleTemplate('${n.id}')">${templateOf(n.id) ? t("tpl_off") : t("tpl_on")}</button>
       ${aiReady() ? `<button class="btn sub" onclick="openSummary()">${t("sum_btn")}</button>` : ""}
       <button class="btn sub" id="speakBtn" onclick="toggleSpeak('${n.id}')">${ttsOn && ttsNoteId === n.id ? t("spk_stop") : t("spk_btn")}</button>
+      <button class="btn sub" onclick="openSplit()">${t("split_btn")}</button>
     </div>
   </div>
   <div class="card outline">
@@ -1251,6 +1274,7 @@ function relatedHtml(n){
     <div class="small">${r.sharedTags.length ? t("shared_tags") + r.sharedTags.map(esc).join("、") + " ／ " : ""}${t("rel_reason")}</div>
     <div class="btnrow" style="margin:6px 0 0;">
       <button class="btn sub" style="min-height:40px; font-size:14px;" onclick="openNote('${r.note.id}')">${t("open_btn")}</button>
+      <button class="btn sub" style="min-height:40px; font-size:14px;" onclick="openPeek('${r.note.id}')">${t("peek_btn")}</button>
       ${linked ? `<span class="small" style="align-self:center;">${t("linked_mark")}</span>` : `<button class="btn sub" style="min-height:40px; font-size:14px;" onclick="insertWikiLink('${r.note.id}')">${t("insert_link")}</button>`}
       <button class="btn ${aiTargets.has(r.note.id) ? "ghost" : "sub"}" style="min-height:40px; font-size:14px;" onclick="toggleAiTarget('${r.note.id}')">${aiTargets.has(r.note.id) ? t("ai_added") : t("ai_add")}</button>
     </div>
@@ -2003,8 +2027,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -2846,6 +2870,234 @@ function sumApplyTitle(i){
   s.msg = t("sum_title_done");
   renderSummaryModal(); renderEditor(); renderNoteList();
 }
+/* ============ 今日のノート・分割・結合・のぞく・表ツール（第14期） ============ */
+async function openTodayNote(){
+  const title = todayText();
+  const ex = notes.find(n => n.fm.title === title);
+  if(ex){ view = "doc"; openNote(ex.id); return; }
+  const n = await createNote(title, "", [], "doing");
+  view = "doc"; openNote(n.id);
+}
+async function copyImagesForBody(ownerId, body){
+  const refs = [...new Set([...body.matchAll(/kairo-img:([a-z0-9]+)/g)].map(m => m[1]))];
+  let out = body;
+  for(const oldId of refs){
+    const rec = await idbGet("images", oldId);
+    if(rec){
+      const nid = uid();
+      await idbPut("images", { id: nid, noteId: ownerId, dataUrl: rec.dataUrl, created: Date.now() });
+      imgCache[nid] = rec.dataUrl;
+      out = out.split("kairo-img:" + oldId).join("kairo-img:" + nid);
+    }
+  }
+  return out;
+}
+function splitSections(body){
+  const lines = body.split("\n");
+  const secs = [];
+  let cur = null, inCode = false;
+  for(const ln of lines){
+    if(/^\s*```/.test(ln)) inCode = !inCode;
+    const m = !inCode ? ln.match(/^##\s+(.+)$/) : null;
+    if(m){ if(cur) secs.push(cur); cur = { title: m[1].trim(), lines: [] }; }
+    else if(cur) cur.lines.push(ln);
+  }
+  if(cur) secs.push(cur);
+  return secs.filter(s => s.title);
+}
+let splitState = null;
+function openSplit(){
+  const n = getNote(currentId); if(!n) return;
+  splitState = { srcId: n.id, secs: splitSections(n.body) };
+  renderSplitModal();
+}
+function renderSplitModal(){
+  const s = splitState; if(!s) return;
+  if(!s.secs.length){
+    openModal(`<h2>${t("split_title")}</h2>
+  <p class="small">${t("split_none")}</p>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
+    return;
+  }
+  openModal(`<h2>${t("split_title")}</h2>
+  <p class="small">${t("split_lead")}</p>
+  <div style="margin:8px 0;">${s.secs.map(sc => `<div class="relitem"><div class="ttl">${esc(sc.title)}</div><div class="small">${t("split_lines").replace("{n}", sc.lines.filter(x => x.trim()).length)}</div></div>`).join("")}</div>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="splitRun()">${t("split_run").replace("{n}", s.secs.length)}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+async function splitRun(){
+  const s = splitState; if(!s) return;
+  const src = getNote(s.srcId); if(!src) return;
+  let made = 0;
+  for(const sc of s.secs){
+    const nn = await createNote(sc.title, sc.lines.join("\n").trim() + "\n", src.fm.tags.slice(), src.fm.status);
+    const nb = await copyImagesForBody(nn.id, nn.body);
+    if(nb !== nn.body){ nn.body = nb; await persistNote(nn); }
+    made++;
+  }
+  splitState = null;
+  openModal(`<h2>${t("split_title")}</h2><p class="small">${t("split_done").replace("{n}", made)}</p>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
+  render();
+}
+let mrgState = null;
+function openMerge(){
+  mrgState = { order: [], msg: "" };
+  renderMergeModal();
+}
+function mrgToggle(id){
+  if(!mrgState) return;
+  const i = mrgState.order.indexOf(id);
+  if(i >= 0) mrgState.order.splice(i, 1); else mrgState.order.push(id);
+  mrgSync();
+}
+function mrgPickTag(i){
+  if(!mrgState) return;
+  const tg = allTags()[i];
+  sortedNotes().filter(n => n.fm.tags.includes(tg)).forEach(n => { if(!mrgState.order.includes(n.id)) mrgState.order.push(n.id); });
+  mrgSync();
+}
+function mrgSync(){
+  document.querySelectorAll("#modalRoot input[data-mid]").forEach(cb => { cb.checked = mrgState.order.includes(cb.dataset.mid); });
+  const c = document.getElementById("mrgCount");
+  if(c) c.textContent = t("merge_selected").replace("{n}", mrgState.order.length);
+  const list = document.getElementById("mrgOrder");
+  if(list) list.innerHTML = mrgState.order.map((id, i) => { const n = getNote(id); return n ? `<div class="small">${i + 1}. ${esc(n.fm.title)}</div>` : ""; }).join("");
+}
+function renderMergeModal(){
+  const s = mrgState; if(!s) return;
+  const tags = allTags();
+  openModal(`<h2>${t("merge_title")}</h2>
+  <p class="small">${t("merge_lead")}</p>
+  <label class="flabel">${t("merge_name")}</label>
+  <input type="text" id="mrgTitle" placeholder="${t("merge_name_ph")}">
+  ${tags.length ? `<div style="margin:10px 0 2px;">${tags.map((tg, i) => `<span class="chip" onclick="mrgPickTag(${i})">${esc(tg)}</span>`).join("")}</div>` : ""}
+  <div style="max-height:32vh; overflow:auto; margin:6px 0;">
+  ${sortedNotes().map(n => `<label class="targetitem"><input type="checkbox" data-mid="${n.id}" ${s.order.includes(n.id) ? "checked" : ""} onchange="mrgToggle('${n.id}')"><span><strong>${esc(n.fm.title)}</strong> <span class="small">${n.fm.tags.map(esc).join("、")}</span></span></label>`).join("")}
+  </div>
+  <p class="small" id="mrgCount">${t("merge_selected").replace("{n}", s.order.length)}</p>
+  <div id="mrgOrder"></div>
+  ${s.msg ? `<div class="msg">${esc(s.msg)}</div>` : ""}
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="mrgRun()">${t("merge_run")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+  mrgSync();
+}
+async function mrgRun(){
+  const s = mrgState; if(!s) return;
+  if(!s.order.length){ s.msg = t("con_empty_sel"); renderMergeModal(); return; }
+  const titleEl = document.getElementById("mrgTitle");
+  const title = (titleEl ? titleEl.value.trim() : "") || t("merge_default_title");
+  const picked = s.order.map(id => getNote(id)).filter(Boolean);
+  const body = picked.map(n => "## " + n.fm.title + "\n\n" + n.body.trim()).join("\n\n") + "\n";
+  const tags = [...new Set(picked.flatMap(n => n.fm.tags))];
+  const nn = await createNote(title, body, tags, "idea");
+  const nb = await copyImagesForBody(nn.id, nn.body);
+  if(nb !== nn.body){ nn.body = nb; await persistNote(nn); }
+  mrgState = null;
+  closeModal();
+  view = "doc";
+  openNote(nn.id);
+}
+function openPeek(id){
+  const n = getNote(id); if(!n) return;
+  openModal(`<h2>${esc(n.fm.title)}</h2>
+  <p class="small">${fmtDate(n.fm.updated)} ／ ${statusLabel(n.fm.status)}${n.fm.tags.length ? " ／ " + n.fm.tags.map(esc).join("、") : ""}</p>
+  <div class="preview">${blocksToHtml(parseBlocks(n.body))}</div>
+  <div class="sheetfoot"><div class="btnrow" style="margin:0">
+    <button class="btn" onclick="closeModal(); view = 'doc'; openNote('${n.id}')">${t("peek_open")}</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
+  </div></div>`);
+}
+/* ----- 表の編集支援 ----- */
+let tblCtx = null;
+function tblParseRow(line){
+  let s = line.trim();
+  if(s.startsWith("|")) s = s.slice(1);
+  if(s.endsWith("|")) s = s.slice(0, -1);
+  return s.split("|").map(c => c.trim());
+}
+function tblIsSep(line){
+  const cells = tblParseRow(line);
+  return cells.length > 0 && cells.every(c => /^:?-+:?$/.test(c));
+}
+function tblFindCtx(){
+  const ta = document.getElementById("edBody");
+  if(!ta) return null;
+  const v = ta.value;
+  const pos = ta.selectionStart;
+  const lines = v.split("\n");
+  const starts = [];
+  let acc = 0;
+  for(const ln of lines){ starts.push(acc); acc += ln.length + 1; }
+  let row = lines.length - 1;
+  for(let i = 0; i < lines.length; i++){ if(pos <= starts[i] + lines[i].length){ row = i; break; } }
+  if(!/^\s*\|/.test(lines[row])) return null;
+  let s = row; while(s > 0 && /^\s*\|/.test(lines[s - 1])) s--;
+  let e = row; while(e < lines.length - 1 && /^\s*\|/.test(lines[e + 1])) e++;
+  if(e - s < 1 || !tblIsSep(lines[s + 1])) return null;
+  const cols = tblParseRow(lines[s + 1]).length;
+  const kind = row === s ? "header" : (row === s + 1 ? "sep" : "data");
+  const before = lines[row].slice(0, pos - starts[row]);
+  const pipes = (before.match(/\|/g) || []).length;
+  let col = lines[row].trimStart().startsWith("|") ? pipes - 1 : pipes;
+  col = Math.max(0, Math.min(cols - 1, col));
+  return { lines, starts, s, e, row, col, cols, kind };
+}
+function tblToolsUpdate(){
+  const box = document.getElementById("tblTools");
+  if(!box) return;
+  const ctx = tblFindCtx();
+  tblCtx = ctx;
+  if(!ctx){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="tbltools">
+    <button ${ctx.kind !== "data" ? "disabled" : ""} onclick="tblOp('rowUp')">${t("tt_row_up")}</button>
+    <button ${ctx.kind === "sep" ? "disabled" : ""} onclick="tblOp('rowDown')">${t("tt_row_down")}</button>
+    <button onclick="tblOp('colLeft')">${t("tt_col_left")}</button>
+    <button onclick="tblOp('colRight')">${t("tt_col_right")}</button>
+    <button ${ctx.kind !== "data" ? "disabled" : ""} onclick="tblOp('delRow')">${t("tt_del_row")}</button>
+    <button ${ctx.cols <= 1 ? "disabled" : ""} onclick="tblOp('delCol')">${t("tt_del_col")}</button>
+  </div>`;
+}
+function tblRowLine(cells){ return "| " + cells.join(" | ") + " |"; }
+function tblOp(op){
+  const ctx = tblCtx || tblFindCtx();
+  if(!ctx) return;
+  const { lines, s, e, row, col, cols } = ctx;
+  const rowsArr = [];
+  for(let i = s; i <= e; i++) rowsArr.push(tblParseRow(lines[i]));
+  const emptyRow = () => Array(cols).fill("");
+  let newRowIdx = row;
+  if(op === "rowUp"){ if(ctx.kind !== "data") return; rowsArr.splice(row - s, 0, emptyRow()); }
+  else if(op === "rowDown"){
+    if(ctx.kind === "sep") return;
+    if(ctx.kind === "header"){ rowsArr.splice(2, 0, emptyRow()); newRowIdx = s + 2; }
+    else { rowsArr.splice(row - s + 1, 0, emptyRow()); newRowIdx = row + 1; }
+  }
+  else if(op === "delRow"){ if(ctx.kind !== "data") return; rowsArr.splice(row - s, 1); newRowIdx = Math.min(row, s + rowsArr.length - 1); }
+  else if(op === "colLeft" || op === "colRight"){
+    const at = op === "colLeft" ? col : col + 1;
+    rowsArr.forEach((r, ri) => r.splice(at, 0, ri === 1 ? "---" : ""));
+  }
+  else if(op === "delCol"){ if(cols <= 1) return; rowsArr.forEach(r => r.splice(col, 1)); }
+  else return;
+  const newLines = lines.slice(0, s).concat(rowsArr.map(tblRowLine), lines.slice(e + 1));
+  const outText = newLines.join("\n");
+  editField("body", outText);
+  const taNow = document.getElementById("edBody");
+  if(taNow) taNow.value = outText;
+  let acc = 0;
+  for(let i = 0; i < newRowIdx; i++) acc += newLines[i].length + 1;
+  const pos = acc + 2;
+  requestAnimationFrame(() => {
+    const t2 = document.getElementById("edBody");
+    if(t2){ t2.focus(); t2.setSelectionRange(pos, pos); }
+    tblToolsUpdate();
+  });
+}
 /* ============ 読み上げ（第13期） ============ */
 let ttsOn = false, ttsNoteId = null, ttsToken = 0;
 function ttsTextOf(n){
@@ -3291,7 +3543,8 @@ async function conSave(){
 function openCreateMenu(){
   openModal(`<h2>${t("create_title")}</h2>
   <div class="btnrow" style="flex-direction:column;">
-    <button class="btn" onclick="closeModal(); newNote();">${t("create_text")}</button>
+    <button class="btn" onclick="closeModal(); openTodayNote();">${t("today_btn")}</button>
+    <button class="btn sub" onclick="closeModal(); newNote();">${t("create_text")}</button>
     <button class="btn sub" onclick="openPad('new')">${t("create_ink")}</button>
     <button class="btn sub" onclick="openVoice()">${t("create_voice")}</button>
     ${templates.length ? `<label class="flabel">${t("tpl_from")}</label>` + templates.map(tp => `<button class="btn sub" onclick="createFromTemplate('${tp.tid}')">📐 ${esc(tp.name)}</button>`).join("") : ""}
