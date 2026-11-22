@@ -51,6 +51,11 @@ main{ padding:14px 14px 110px; max-width:1180px; margin:0 auto; }
 .btn:disabled{ opacity:.45; cursor:default; }
 .btnrow{ display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
 .btnrow .btn{ flex:1; }
+.listactions .btn{ flex:1 1 42%; }
+@media (min-width:768px){
+  .listactions{ flex-wrap:nowrap; }
+  .listactions .btn{ flex:1; writing-mode:vertical-rl; text-orientation:mixed; display:flex; align-items:center; justify-content:center; letter-spacing:.08em; padding:14px 6px; }
+}
 input[type=text],input[type=password],textarea,select{ width:100%; font-size:16px; padding:11px 12px; border:1.5px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); font-family:inherit; }
 textarea{ line-height:1.6; }
 label.flabel{ display:block; font-size:13px; font-weight:700; color:var(--muted); margin:12px 0 4px; }
@@ -160,6 +165,7 @@ body[data-fs="big"] .focusbody textarea{ font-size:21px; }
 body[data-fs="xl"] .focusbody textarea{ font-size:25px; }
 body[data-fs="big"] .focusbody .fpreview{ font-size:20px; }
 body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
+.mini{ min-height:40px; padding:6px 12px; border-radius:9px; border:1.5px solid var(--line); background:#fff; color:var(--ink); font-size:13.5px; font-weight:700; cursor:pointer; }
 .pinbtn{ white-space:nowrap; }
 .noteitem .pinmark{ color:#b97e14; }
 .seg2{ display:inline-flex; border:1.5px solid var(--line); border-radius:999px; overflow:hidden; }
@@ -230,7 +236,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .selbar button{ min-height:44px; border:0; border-radius:999px; background:rgba(255,255,255,.14); color:#fff; font-size:14px; font-weight:700; padding:6px 14px; cursor:pointer; white-space:nowrap; }
 .vbar{ display:flex; align-items:center; gap:8px; margin:0 0 8px; flex-wrap:wrap; }
 .vbar .mini.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
-.vpreview{ writing-mode:vertical-rl; width:100%; max-width:100%; box-sizing:border-box; height:62vh; min-height:340px; overflow-x:auto; overflow-y:hidden; line-height:2; letter-spacing:.02em; }
+.vpreview{ writing-mode:vertical-rl; text-orientation:mixed; width:100%; max-width:100%; box-sizing:border-box; height:62vh; min-height:340px; overflow-x:auto; overflow-y:hidden; line-height:2; letter-spacing:.02em; }
 .vpreview table, .vpreview pre, .vpreview img{ writing-mode:horizontal-tb; }
 .vpreview img{ max-height:72%; }
 .vpreview.grid{ background-image:linear-gradient(to left, rgba(61,52,139,.13) 1px, transparent 1px), linear-gradient(to bottom, rgba(61,52,139,.13) 1px, transparent 1px); background-size:2em 2em; }
@@ -254,6 +260,12 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
   #printArea .prt-date{ font-size:10pt; color:#555; margin-bottom:14pt; }
   #printArea .preview{ background:none; border:none; padding:0; min-height:0; font-size:12pt; line-height:1.9; }
   #printArea .preview img{ max-width:100%; }
+  #printArea .prt-cover{ text-align:center; padding-top:58mm; page-break-after:always; }
+  #printArea .prt-cover h1{ font-size:26pt; line-height:1.5; margin:0 0 10pt; }
+  #printArea .prt-toc{ page-break-after:always; }
+  #printArea .prt-toc h2{ font-size:16pt; margin:0 0 10pt; }
+  #printArea .prt-toc li{ font-size:12pt; line-height:2; }
+  #printArea .prt-sec{ page-break-before:always; }
   @page{ size:A4; margin:18mm; }
 }
 </style>
@@ -282,7 +294,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.14.0";
+const APP_VER = "1.15.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -412,6 +424,8 @@ const STR = {
   selbar_label: ["選択バー（選んで調べる）", "Selection bar (look up)"], selbar_on: ["オン", "On"], selbar_off: ["オフ", "Off"],
   vgrid_btn: ["原稿用紙マス目", "Manuscript grid"], v_note: ["横スクロールで読み進めます", "Scroll sideways to read"],
   spk_sel: ["🔊 選んだところを読む", "🔊 Read selection"], spk_rate: ["速度", "Speed"], spk_std: ["標準", "Normal"], spk_slow: ["ゆっくり", "Slow"],
+  cmp_print: ["🖨 まとめて印刷", "🖨 Print all"], cmp_print_toc: ["目次を付ける", "Include a table of contents"],
+  today_past_lead: ["同じ月日のノートがあります：", "Notes from the same day in past years:"],
   today_btn: ["📅 今日のノート", "📅 Today's note"],
   split_btn: ["✂️ 見出しで分割", "✂️ Split by headings"], split_title: ["✂️ 見出しで分割", "✂️ Split by headings"],
   split_lead: ["レベル2の見出し（##）ごとに、新しいノートを作ります。元のノートはそのまま残ります。", "A new note is made for each level-2 heading (##). The original note stays as it is."],
@@ -762,7 +776,7 @@ function openHistory(id){
         <button class="mini" onclick="restoreHistory('${id}', ${en.ts})">この形に戻す</button>
       </div>`;
     }).join("") : `<p class="small">まだ履歴がありません。ノートを編集して保存すると、ここに控えが残ります。</p>`}
-    <div class="sheetfoot"><div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div></div>`);
+    <div class="sheetfoot"><div class="btnrow"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
   });
 }
 async function restoreHistory(id, ts){
@@ -830,9 +844,21 @@ const WALK_SAMPLES = [
   { title: "歩き方4：AIと考える", tags: ["歩き方", "AI"], status: "keep", body:
 "# 歩き方4：AIと考える\n\nAI機能は、すべて任意で、初期設定はOFFです。\n\n- **AI整理**：複数のノートの統合や整理の案を、差分プレビューで確認してから実行します\n- **英訳**：編集画面で文章を選んで、英訳の下書きを作ります\n- **問いかけ**：開いているノートをもとに、考えを深める問いを提案します。本文へは、選んだものだけが入ります\n\nどれも「AIの案は下書き」という約束で作られています。\n\n入口に戻る：[[Kairoの歩き方（入口）]]" }
 ];
+
+const WALK2_SAMPLES = [
+  { title: "歩き方5：回廊と今日のノート", tags: ["歩き方", "眺める"], status: "doing", body:
+"# 歩き方5：回廊と今日のノート\n\n第10期で入った「回廊」と、第14期の「今日のノート」の案内です。\n\n- **回廊**：下のバー（広い画面では上のメニュー）の「🚶 回廊」を押すと、ノートが作られた順に、月ごとの門をくぐるように並びます。昔のノートをたどる散歩道です\n- **今日のノート**：「＋新規」や一覧の「📅 今日のノート」を押すと、その日の日付の題名のノートが開きます。同じ日にもう一度押しても、同じノートが開きます（2つになりません）\n- 今日のノートを開いたとき、去年や一昨年の同じ月日に作ったノートがあれば、上のほうに小さく案内が出ます\n\n入口に戻る：[[Kairoの歩き方（入口）]]" },
+  { title: "歩き方6：縦書きと選んで調べる", tags: ["歩き方", "読み方"], status: "idea", body:
+"# 歩き方6：縦書きと選んで調べる\n\n第15期で入った、読むための道具の案内です。\n\n- **縦書きビュー**：ノートを開いて、表示切替の「🖋 縦書き」を押すと、文章が縦書きで読めます。本文そのものは横書きのままです。「原稿用紙マス目」を付けると、原稿用紙のように読めます\n- **選んで調べる**：編集やプレビューで文章を選ぶと、近くに小さなバーが出ます。「関連ノート」は選んだ言葉を含むノート探し、「Webで調べる」は検索、英単語を選んだときは「辞書」も出ます\n- **選んだところを読む**：文章を選んでいると、読み上げの近くに「選んだところを読む」が出て、その範囲だけ読み上げます。速度は「標準／ゆっくり」の2段階です\n\n入口に戻る：[[Kairoの歩き方（入口）]]" },
+  { title: "歩き方7：表とのぞく", tags: ["歩き方", "書き方"], status: "doing", body:
+"# 歩き方7：表とのぞく\n\n第12期・第14期で入った、書く道具の案内です。\n\n- **表の挿入**：編集画面の「▦ 表」を押して、大きさを選ぶと表が入ります\n- **表の編集**：表の中にカーソルを置くと、行や列を足したり消したりするボタンが出ます\n- **のぞく**：関連メモの「👀 のぞく」を押すと、今のノートを閉じずに中身をちらりと読めます\n\n## 表の例\n\n| 品目 | 数 |\n| --- | --- |\n| りんご | 3 |\n| みかん | 5 |\n\n入口に戻る：[[Kairoの歩き方（入口）]]" },
+  { title: "歩き方8：守ると相談する", tags: ["歩き方", "安心"], status: "keep", body:
+"# 歩き方8：守ると相談する\n\n第12期・第13期で入った、安心のための道具の案内です。\n\n- **バックアップと復元**：設定の「💾 バックアップと復元」から、全ノートを1つのファイルに書き出せます。復元は「追加」と「すべて入れ替え」があり、入れ替えの前には今の状態の控えが自動で残ります\n- **リマインド**：バックアップが古くなると、一覧の上に小さくお知らせが出ます\n- **複数ノートのAI相談**：AIキーがあるとき、「AI整理」の画面で複数のノートを選んで、まとめた要約や、つながりを考える問いかけを作れます。結果は新しいノートとして下書き保存され、元のノートは変わりません\n\n入口に戻る：[[Kairoの歩き方（入口）]]" }
+];
+function allWalkSamples(){ return WALK_SAMPLES.concat(WALK2_SAMPLES); }
 async function addWalkSamples(){
   let added = 0;
-  for(const s of WALK_SAMPLES){
+  for(const s of allWalkSamples()){
     if(notes.some(n => n.fm.title === s.title)) continue;
     const t = nowIso();
     const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
@@ -847,7 +873,7 @@ async function addWalkSamples(){
   return added;
 }
 async function seedSamples(){
-  for(const s of WALK_SAMPLES){
+  for(const s of allWalkSamples()){
     const t = nowIso();
     const n = { id: uid(), fm: { title: s.title, tags: s.tags, status: s.status, created: t, updated: t }, body: s.body };
     notes.push(n);
@@ -968,7 +994,7 @@ function docViewHtml(){
         <div style="margin-top:9px;">
           <span class="chip ${tagFilter === "" ? "on" : ""}" onclick="tagFilter = ''; render();">${t("all")}</span>${allTags().map((t, i) => `<span class="chip ${tagFilter === t ? "on" : ""}" onclick="tagFilter = allTags()[${i}]; render();">${esc(t)}</span>`).join("")}
         </div>
-        <div class="btnrow" style="margin-bottom:0;">
+        <div class="btnrow listactions" style="margin-bottom:0;">
           <button class="btn sub" onclick="openImport()">${t("import_btn")}</button>
           <button class="btn sub" onclick="openExportAll()">${t("export_all_btn")}</button>
           <button class="btn sub" onclick="openCompile()">${t("cmp_btn")}</button>
@@ -1107,7 +1133,7 @@ function editorHtml(n){
   const ol = outlineOf(blocks);
   return `
   <button class="btn ghost backbtn" style="min-height:42px; margin-bottom:10px;" onclick="backToList()">${t("back_to_list")}</button>
-  <div class="card">
+  ${todayPastHtml(n)}<div class="card">
     <label class="flabel">${t("f_title")}</label>
     <input type="text" class="edtitle" id="edTitle" value="${esc(n.fm.title)}" oninput="editField('title', this.value)">
     <label class="flabel">${t("f_tags")}</label>
@@ -1177,6 +1203,7 @@ function renderEditor(){
   if(pane) pane.innerHTML = n ? editorHtml(n) : emptyEditorHtml();
 }
 function openNote(id){
+  todayPast = null;
   currentId = id;
   edMode = "edit";
   render();
@@ -1431,7 +1458,7 @@ function bodyForExport(n){
 /* ============ テーマ別まとめ書き出し（第9期） ============ */
 let cmpState = null;
 function openCompile(){
-  cmpState = { sel: new Set(), sort: "title", title: "", format: "md" };
+  cmpState = { sel: new Set(), sort: "title", title: "", format: "md", toc: true };
   renderCompileModal();
 }
 function renderCompileModal(){
@@ -1449,9 +1476,11 @@ function renderCompileModal(){
   <div class="seg2"><button class="${cs.format === "md" ? "on" : ""}" onclick="cmpSetFormat('md')">${t("cmp_fmt_md")}</button><button class="${cs.format === "html" ? "on" : ""}" onclick="cmpSetFormat('html')">${t("cmp_fmt_html")}</button></div>
   <label class="flabel">${t("cmp_name")}</label>
   <input type="text" id="cmpTitle" value="${esc(cs.title)}" placeholder="${t("cmp_name_ph")}" oninput="cmpState.title = this.value">
+  <label class="checkrow"><input type="checkbox" checked onchange="cmpState.toc = this.checked"><span>${t("cmp_print_toc")}</span></label>
   <div id="cmpMsg"></div>
   <div class="sheetfoot"><div class="btnrow" style="margin:0;">
     <button class="btn" onclick="cmpExport()">${t("cmp_export")}（<span id="cmpCount">${cs.sel.size}</span>${LANG === "en" ? "" : "件"}）</button>
+    <button class="btn sub" onclick="cmpPrint()">${t("cmp_print")}</button>
     <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
   </div></div>`);
 }
@@ -1575,15 +1604,35 @@ function buildMiniBook(){
   return { title, text, count: list.length };
 }
 /* ============ ノートの印刷（第9期） ============ */
-function printNote(id){
-  const n = getNote(id); if(!n) return;
+function startPrint(html){
   const pa = document.getElementById("printArea");
   if(!pa) return;
-  pa.innerHTML = `<div class="prt-head"><h1>${esc(n.fm.title)}</h1><div class="prt-date">${t("prt_created")}：${esc(fmtDate(n.fm.created).slice(0, 10))} ／ ${t("prt_updated")}：${esc(fmtDate(n.fm.updated).slice(0, 10))}</div></div><div class="preview">${blocksToHtml(parseBlocks(n.body))}</div>`;
+  pa.innerHTML = html;
   document.body.classList.add("printing-note");
   const done = () => { document.body.classList.remove("printing-note"); pa.innerHTML = ""; window.removeEventListener("afterprint", done); };
   window.addEventListener("afterprint", done);
   setTimeout(() => window.print(), 60);
+}
+function printNote(id){
+  const n = getNote(id); if(!n) return;
+  startPrint(`<div class="prt-head"><h1>${esc(n.fm.title)}</h1><div class="prt-date">${t("prt_created")}：${esc(fmtDate(n.fm.created).slice(0, 10))} ／ ${t("prt_updated")}：${esc(fmtDate(n.fm.updated).slice(0, 10))}</div></div><div class="preview">${blocksToHtml(parseBlocks(n.body))}</div>`);
+}
+function cmpPrint(){
+  if(!cmpState) return;
+  const list = cmpOrderedNotes();
+  const msg = document.getElementById("cmpMsg");
+  if(!list.length){ if(msg) msg.innerHTML = `<div class="msg">${t("cmp_empty")}</div>`; return; }
+  const inp = document.getElementById("cmpTitle");
+  const title = (inp && inp.value.trim()) || cmpState.title || t("cmp_title");
+  const today = fmtDate(nowIso()).slice(0, 10);
+  const countLine = LANG === "en" ? list.length + " notes" : list.length + "件のノート";
+  let html = `<div class="prt-cover"><h1>${esc(title)}</h1><div class="prt-date">${esc(today)} ・ ${countLine}</div></div>`;
+  if(cmpState.toc){
+    html += `<div class="prt-toc"><h2>${t("book_toc")}</h2><ol>` + list.map(n => `<li>${esc(n.fm.title)}</li>`).join("") + `</ol></div>`;
+  }
+  html += list.map(n => `<section class="prt-sec"><div class="prt-head"><h1>${esc(n.fm.title)}</h1><div class="prt-date">${t("prt_created")}：${esc(fmtDate(n.fm.created).slice(0, 10))} ／ ${t("prt_updated")}：${esc(fmtDate(n.fm.updated).slice(0, 10))}</div></div><div class="preview">${blocksToHtml(parseBlocks(n.body))}</div></section>`).join("");
+  closeModal();
+  startPrint(html);
 }
 function mdForExport(n){
   /* 書き出しでは手書き画像をdata URIで埋め込み、単体ファイルでも見られる形にする */
@@ -1636,7 +1685,7 @@ function openImport(){
   <div id="impMsg"></div>
   <div class="btnrow">
     <button class="btn" onclick="importPaste()">貼り付けを取り込む</button>
-    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
   </div>
   <div class="btnrow">
     <button class="btn sub" onclick="openAiImport()">🤖 AIが編集した.mdはこちら（差分確認つき）</button>
@@ -2066,8 +2115,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。第15期では、選んで調べる選択バー、縦書きビュー、選択範囲の読み上げと速度切り替えが入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes. Phase 15 adds a selection lookup bar, a vertical reading view, and selection read-aloud with a speed toggle.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。第15期では、選んで調べる選択バー、縦書きビュー、選択範囲の読み上げと速度切り替えが入りました。第16期では、全体点検（速度・英語表示・狭い画面・ボタンの大きさ）を行い、まとめ印刷、見本「Kairoの歩き方」の増補、今日のノートで過去の同じ月日を案内する小さな深化が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes. Phase 15 adds a selection lookup bar, a vertical reading view, and selection read-aloud with a speed toggle. Phase 16 is a polish pass: a full audit, compilation printing, more walk-through samples, and a small deepening of Today's Note.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -2601,7 +2650,7 @@ function openAiImport(){
   <textarea id="aiImpText" rows="6" placeholder="編集済みのMarkdownをここに貼り付け"></textarea>
   <div class="sheetfoot">
   <div class="btnrow"><button class="btn" onclick="aiImportPaste()">差分をプレビュー</button></div>
-  <div class="btnrow"><button class="btn ghost" onclick="closeModal()">閉じる</button></div>
+  <div class="btnrow"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div>
   </div>`);
 }
 async function aiImportFiles(input){
@@ -2654,7 +2703,7 @@ function renderImportProposal(){
   <div id="impPropMsg"></div>
   <div class="btnrow">
     ${ip.items.length ? `<button class="btn" onclick="applyImportProposal()">✓ 承認した項目を取り込む</button>` : ""}
-    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
   </div>
   </div>`);
 }
@@ -2695,7 +2744,7 @@ async function applyImportProposal(){
   view = "doc";
   openModal(`<h2>取り込みました</h2>
   <p class="small">更新 ${upd} 件・新規 ${cre} 件を取り込みました。実行前の控えを残してあるので、AI画面の「スナップショットとロールバック」から元に戻せます。</p>
-  <div class="sheetfoot"><div class="btnrow"><button class="btn" onclick="closeModal(); render();">閉じる</button></div></div>`);
+  <div class="sheetfoot"><div class="btnrow"><button class="btn" onclick="closeModal(); render();">${t("close_btn")}</button></div></div>`);
   render();
 }
 /* ============ フォルダ連携（File System Access・対応環境のみ） ============ */
@@ -2921,12 +2970,27 @@ function setSelBar(v){
   render();
 }
 /* ============ 今日のノート・分割・結合・のぞく・表ツール（第14期） ============ */
+let todayPast = null;
+let todayPastClosed = false;
+function todayPastHtml(n){
+  if(!todayPast || !todayPast.length || todayPastClosed) return "";
+  if(n.fm.title !== todayText()) return "";
+  const btns = todayPast.slice(0, 3).map(p => `<button class="mini" onclick="openTodayPast('${p.id}')">${esc(p.fm.created.slice(0, 4))}年：${esc(p.fm.title)}</button>`).join("");
+  return `<div class="remindbar"><span>📅 ${t("today_past_lead")}</span>${btns}<button class="mini" onclick="closeTodayPast()">${t("close_btn")}</button></div>`;
+}
+function openTodayPast(id){ todayPast = null; view = "doc"; openNote(id); }
+function closeTodayPast(){ todayPastClosed = true; renderEditor(); }
 async function openTodayNote(){
   const title = todayText();
   const ex = notes.find(n => n.fm.title === title);
-  if(ex){ view = "doc"; openNote(ex.id); return; }
-  const n = await createNote(title, "", [], "doing");
-  view = "doc"; openNote(n.id);
+  const target = ex || await createNote(title, "", [], "doing");
+  view = "doc"; openNote(target.id);
+  const md = target.fm.created.slice(5, 10);
+  const yr = target.fm.created.slice(0, 4);
+  todayPast = notes.filter(x => x.id !== target.id && x.fm.created.slice(5, 10) === md && x.fm.created.slice(0, 4) < yr)
+    .sort((a, b) => String(b.fm.created).localeCompare(String(a.fm.created)));
+  todayPastClosed = false;
+  if(todayPast.length) renderEditor();
 }
 async function copyImagesForBody(ownerId, body){
   const refs = [...new Set([...body.matchAll(/kairo-img:([a-z0-9]+)/g)].map(m => m[1]))];
@@ -3711,7 +3775,7 @@ function openCreateMenu(){
     <button class="btn sub" onclick="openPad('new')">${t("create_ink")}</button>
     <button class="btn sub" onclick="openVoice()">${t("create_voice")}</button>
     ${templates.length ? `<label class="flabel">${t("tpl_from")}</label>` + templates.map(tp => `<button class="btn sub" onclick="createFromTemplate('${tp.tid}')">📐 ${esc(tp.name)}</button>`).join("") : ""}
-    <button class="btn ghost" onclick="closeModal()">閉じる</button>
+    <button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button>
   </div>
   <p class="small">${t("create_note")}</p>`);
 }
@@ -3793,7 +3857,7 @@ function openPad(target){
       ? `<button class="btn sub" onclick="inkOcr()">🤖 AIで文字起こし</button>`
       : ``}
   </div>
-  <div class="btnrow"><button class="btn ghost" onclick="closeInk()">閉じる</button></div>
+  <div class="btnrow"><button class="btn ghost" onclick="closeInk()">${t("close_btn")}</button></div>
   </div>`);
   initInkCanvas();
 }
@@ -3985,7 +4049,7 @@ function openVoice(){
   </div>
   <div class="btnrow">
     <button class="btn ghost" id="voiceUndoBtn" style="display:none;" onclick="voiceUndoStructure()">↩ 整える前の文に戻す</button>
-    <button class="btn ghost" onclick="closeVoice()">閉じる</button>
+    <button class="btn ghost" onclick="closeVoice()">${t("close_btn")}</button>
   </div>
   </div>`);
 }
