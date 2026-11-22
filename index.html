@@ -226,6 +226,14 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 .tblgrid{ display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; max-width:320px; margin:10px 0; }
 .tblcell{ height:34px; border:1.5px solid var(--line); border-radius:8px; background:#fff; padding:0; cursor:pointer; }
 .tblcell.on{ background:#d9d2f2; border-color:var(--teal); }
+.selbar{ position:fixed; z-index:70; display:flex; gap:6px; background:#2e2766; border-radius:999px; padding:6px; box-shadow:0 8px 24px rgba(30,25,70,.35); visibility:hidden; }
+.selbar button{ min-height:44px; border:0; border-radius:999px; background:rgba(255,255,255,.14); color:#fff; font-size:14px; font-weight:700; padding:6px 14px; cursor:pointer; white-space:nowrap; }
+.vbar{ display:flex; align-items:center; gap:8px; margin:0 0 8px; flex-wrap:wrap; }
+.vbar .mini.on{ background:var(--teal); color:#fff; border-color:var(--teal); }
+.vpreview{ writing-mode:vertical-rl; width:100%; max-width:100%; box-sizing:border-box; height:62vh; min-height:340px; overflow-x:auto; overflow-y:hidden; line-height:2; letter-spacing:.02em; }
+.vpreview table, .vpreview pre, .vpreview img{ writing-mode:horizontal-tb; }
+.vpreview img{ max-height:72%; }
+.vpreview.grid{ background-image:linear-gradient(to left, rgba(61,52,139,.13) 1px, transparent 1px), linear-gradient(to bottom, rgba(61,52,139,.13) 1px, transparent 1px); background-size:2em 2em; }
 .tbltools{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0 2px; }
 .tbltools button{ min-height:40px; padding:4px 10px; border-radius:9px; border:1.5px solid var(--line); background:#efeafd; color:var(--ink); font-size:13px; font-weight:700; cursor:pointer; }
 .tbltools button:disabled{ opacity:.38; cursor:default; }
@@ -269,11 +277,12 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <nav class="bottombar" id="bottombar"></nav>
 <div id="modalRoot"></div>
 <div id="focusRoot"></div>
+<div id="selRoot"></div>
 <div id="waitRoot"></div>
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.13.0";
+const APP_VER = "1.14.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -397,6 +406,12 @@ const STR = {
   cmp_btn: ["📚 まとめ書き出し", "📚 Compilation"], corr_lead: ["時間の流れに沿って、思考の回廊を歩きます。", "Walk the corridor of your thoughts, along the flow of time."],
   cmp_format: ["出力形式", "Format"], cmp_fmt_md: ["Markdown（清書）", "Markdown"], cmp_fmt_html: ["HTMLミニ本", "HTML mini-book"],
   book_toc: ["目次", "Contents"], book_footer: ["Kairo Note で作成したミニ本です", "A mini-book made with Kairo Note"],
+  seg_vertical: ["🖋 縦書き", "🖋 Vertical"],
+  sel_related: ["🔎 関連ノート", "🔎 Related notes"], sel_web: ["🌐 Webで調べる", "🌐 Search the web"], sel_dict: ["📖 辞書", "📖 Dictionary"],
+  sel_for: ["「{q}」を含むノート", "Notes containing “{q}”"], sel_none: ["見つかりませんでした。", "No notes found."],
+  selbar_label: ["選択バー（選んで調べる）", "Selection bar (look up)"], selbar_on: ["オン", "On"], selbar_off: ["オフ", "Off"],
+  vgrid_btn: ["原稿用紙マス目", "Manuscript grid"], v_note: ["横スクロールで読み進めます", "Scroll sideways to read"],
+  spk_sel: ["🔊 選んだところを読む", "🔊 Read selection"], spk_rate: ["速度", "Speed"], spk_std: ["標準", "Normal"], spk_slow: ["ゆっくり", "Slow"],
   today_btn: ["📅 今日のノート", "📅 Today's note"],
   split_btn: ["✂️ 見出しで分割", "✂️ Split by headings"], split_title: ["✂️ 見出しで分割", "✂️ Split by headings"],
   split_lead: ["レベル2の見出し（##）ごとに、新しいノートを作ります。元のノートはそのまま残ります。", "A new note is made for each level-2 heading (##). The original note stays as it is."],
@@ -486,8 +501,8 @@ const STR = {
 };
 function t(k){ const e = STR[k]; if(!e) return k; return LANG === "en" ? (e[1] || e[0]) : e[0]; }
 function statusLabel(s){ return t("st_" + (STATUS_KEYS.includes(s) ? s : "idea")); }
-function setLang(l){ LANG = l === "en" ? "en" : "ja"; try{ localStorage.setItem("kairo-lang", LANG); }catch(e){} applyStaticLang(); render(); if(focusMode) renderFocus(); }
-function setFs(v){ FS = ["std", "big", "xl"].includes(v) ? v : "std"; try{ localStorage.setItem("kairo-fs", FS); }catch(e){} applyFs(); render(); if(focusMode) renderFocus(); }
+function setLang(l){ LANG = l === "en" ? "en" : "ja"; try{ localStorage.setItem("kairo-lang", LANG); }catch(e){} applyStaticLang(); render(); if(focusOpen) renderFocus(); }
+function setFs(v){ FS = ["std", "big", "xl"].includes(v) ? v : "std"; try{ localStorage.setItem("kairo-fs", FS); }catch(e){} applyFs(); render(); if(focusOpen) renderFocus(); }
 function applyFs(){ if(document.body) document.body.dataset.fs = FS; }
 function applyStaticLang(){
   const h = document.getElementById("hdrTag"); if(h) h.textContent = t("hdr_tag");
@@ -692,6 +707,9 @@ try{ (JSON.parse(localStorage.getItem("kairo-ai-targets") || "[]")).forEach(id =
 function saveAiTargets(){ try{ localStorage.setItem("kairo-ai-targets", JSON.stringify(Array.from(aiTargets))); }catch(e){} }
 function getNote(id){ return notes.find(n => n.id === id) || null; }
 let SORT_MODE = localStorage.getItem("kairo-sort") || "updated";
+let SELBAR_ON = localStorage.getItem("kairo-selbar") !== "off";
+let VGRID = localStorage.getItem("kairo-vgrid") === "on";
+let ttsRate = localStorage.getItem("kairo-tts-rate") === "slow" ? "slow" : "std";
 function setSort(v){
   SORT_MODE = v;
   localStorage.setItem("kairo-sort", v);
@@ -1101,6 +1119,7 @@ function editorHtml(n){
     <div class="seg">
       <button class="${edMode === "edit" ? "on" : ""}" onclick="setEdMode('edit')">${t("seg_edit")}</button>
       <button class="${edMode === "preview" ? "on" : ""}" onclick="setEdMode('preview')">${t("seg_preview")}</button>
+      <button class="${edMode === "vertical" ? "on" : ""}" onclick="setEdMode('vertical')">${t("seg_vertical")}</button>
     </div>
     ${edMode === "edit"
       ? `<div class="mdbar">
@@ -1118,7 +1137,9 @@ function editorHtml(n){
         </div>
         <div id="tblTools"></div>
         <textarea class="ed" id="edBody" oninput="editField('body', this.value); tblToolsUpdate();" onclick="tblToolsUpdate()" onkeyup="tblToolsUpdate()" placeholder="${t("ed_ph")}">${esc(n.body)}</textarea>`
-      : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
+      : edMode === "vertical"
+        ? `<div class="vbar"><button class="mini ${VGRID ? "on" : ""}" onclick="toggleVGrid()">${t("vgrid_btn")}：${VGRID ? "ON" : "OFF"}</button><span class="small">${t("v_note")}</span></div><div class="preview vpreview ${VGRID ? "grid" : ""}" id="previewBox">${blocksToHtml(blocks)}</div>`
+        : `<div class="preview" id="previewBox">${blocksToHtml(blocks)}</div>`}
     <div class="small" style="margin-top:8px;">${t("autosave")} ／ ${t("updated")} ${fmtDate(n.fm.updated)}</div>
     <div class="btnrow">
       <button class="btn sub" onclick="exportNote('${n.id}')">${t("export_md")}</button>
@@ -1138,6 +1159,8 @@ function editorHtml(n){
       <button class="btn sub" onclick="toggleTemplate('${n.id}')">${templateOf(n.id) ? t("tpl_off") : t("tpl_on")}</button>
       ${aiReady() ? `<button class="btn sub" onclick="openSummary()">${t("sum_btn")}</button>` : ""}
       <button class="btn sub" id="speakBtn" onclick="toggleSpeak('${n.id}')">${ttsOn && ttsNoteId === n.id ? t("spk_stop") : t("spk_btn")}</button>
+      <button class="btn sub" id="spkRateBtn" onclick="toggleTtsRate()">${t("spk_rate")}：${ttsRate === "slow" ? t("spk_slow") : t("spk_std")}</button>
+      <span id="selSpeakWrap"></span>
       <button class="btn sub" onclick="openSplit()">${t("split_btn")}</button>
     </div>
   </div>
@@ -1164,7 +1187,19 @@ function backToList(){
 }
 function setEdMode(m){
   edMode = m;
+  hideSelBar();
   renderEditor();
+}
+function toggleVGrid(){
+  VGRID = !VGRID;
+  localStorage.setItem("kairo-vgrid", VGRID ? "on" : "off");
+  renderEditor();
+}
+function toggleTtsRate(){
+  ttsRate = ttsRate === "slow" ? "std" : "slow";
+  localStorage.setItem("kairo-tts-rate", ttsRate);
+  const b = document.getElementById("spkRateBtn");
+  if(b) b.textContent = t("spk_rate") + "：" + (ttsRate === "slow" ? t("spk_slow") : t("spk_std"));
 }
 function editField(field, value){
   const n = currentId ? getNote(currentId) : null;
@@ -1200,7 +1235,7 @@ function jumpHeading(idx){
   const blocks = parseBlocks(n.body);
   const heads = blocks.map((b, i) => ({ b, i })).filter(x => x.b.type === "heading");
   if(!heads[idx]) return;
-  if(edMode === "preview"){
+  if(edMode !== "edit"){
     const box = document.getElementById("previewBox");
     if(!box) return;
     const els = box.querySelectorAll("h1,h2,h3,h4,h5,h6");
@@ -1307,12 +1342,14 @@ function toggleAiTarget(id){
 }
 /* ============ 集中執筆モード ============ */
 let focusMode = "edit";
+let focusOpen = false;
 let focusSavedText = t("focus_autosave");
 let focusTimer = null;
 function focusMetaText(n){ return LANG === "en" ? n.body.length + " characters — " + focusSavedText : "本文 " + n.body.length + " 文字 ／ " + focusSavedText; }
 function openFocus(){
   const n = currentId ? getNote(currentId) : null;
   if(!n) return;
+  focusOpen = true;
   focusMode = "edit";
   focusSavedText = t("focus_autosave");
   renderFocus();
@@ -1320,6 +1357,7 @@ function openFocus(){
   if(ta) ta.focus();
 }
 function renderFocus(){
+  if(!focusOpen) return;
   const n = currentId ? getNote(currentId) : null;
   if(!n) return;
   $("#focusRoot").innerHTML = `<div class="focuswrap">
@@ -1361,6 +1399,7 @@ async function toggleFocusMode(){
 }
 async function closeFocus(){
   await flushFocusSave();
+  focusOpen = false;
   $("#focusRoot").innerHTML = "";
   renderEditor();
   renderNoteList();
@@ -2027,8 +2066,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。第15期では、選んで調べる選択バー、縦書きビュー、選択範囲の読み上げと速度切り替えが入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes. Phase 15 adds a selection lookup bar, a vertical reading view, and selection read-aloud with a speed toggle.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -2042,6 +2081,11 @@ function settingsViewHtml(){
       <button class="${FS === "std" ? "on" : ""}" onclick="setFs('std')">${t("fs_std")}</button>
       <button class="${FS === "big" ? "on" : ""}" onclick="setFs('big')">${t("fs_big")}</button>
       <button class="${FS === "xl" ? "on" : ""}" onclick="setFs('xl')">${t("fs_xl")}</button>
+    </div>
+    <label class="flabel">${t("selbar_label")}</label>
+    <div class="seg2">
+      <button class="${SELBAR_ON ? "on" : ""}" onclick="setSelBar(true)">${t("selbar_on")}</button>
+      <button class="${!SELBAR_ON ? "on" : ""}" onclick="setSelBar(false)">${t("selbar_off")}</button>
     </div>
     <p class="small">${t("disp_note")}</p>
   </div>
@@ -2870,6 +2914,12 @@ function sumApplyTitle(i){
   s.msg = t("sum_title_done");
   renderSummaryModal(); renderEditor(); renderNoteList();
 }
+function setSelBar(v){
+  SELBAR_ON = !!v;
+  localStorage.setItem("kairo-selbar", SELBAR_ON ? "on" : "off");
+  if(!SELBAR_ON) hideSelBar();
+  render();
+}
 /* ============ 今日のノート・分割・結合・のぞく・表ツール（第14期） ============ */
 async function openTodayNote(){
   const title = todayText();
@@ -3098,10 +3148,109 @@ function tblOp(op){
     tblToolsUpdate();
   });
 }
+/* ============ 選んで調べる（第15期） ============ */
+let selState = { text: "", from: "" };
+function selCurrentText(){
+  const ta = document.getElementById("edBody");
+  if(ta && ta.selectionStart !== undefined && ta.selectionStart !== ta.selectionEnd)
+    return { text: ta.value.slice(ta.selectionStart, ta.selectionEnd), from: "edit" };
+  const pv = document.getElementById("previewBox");
+  const sel = window.getSelection();
+  if(pv && sel && !sel.isCollapsed && sel.rangeCount && pv.contains(sel.anchorNode))
+    return { text: sel.toString(), from: "preview" };
+  return null;
+}
+function selAnchorRect(){
+  const ta = document.getElementById("edBody");
+  if(ta && ta.selectionStart !== undefined && ta.selectionStart !== ta.selectionEnd){
+    const cs = getComputedStyle(ta);
+    const div = document.createElement("div");
+    ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "boxSizing"].forEach(p => { div.style[p] = cs[p]; });
+    div.style.position = "absolute";
+    div.style.visibility = "hidden";
+    div.style.whiteSpace = "pre-wrap";
+    div.style.wordWrap = "break-word";
+    div.style.overflowWrap = "break-word";
+    div.style.width = ta.clientWidth + "px";
+    div.textContent = ta.value.slice(0, ta.selectionStart);
+    const span = document.createElement("span");
+    span.textContent = "​";
+    div.appendChild(span);
+    document.body.appendChild(div);
+    const dr = div.getBoundingClientRect(), sr = span.getBoundingClientRect(), tr = ta.getBoundingClientRect();
+    const lh = parseFloat(cs.lineHeight) || 24;
+    const r = { left: tr.left + (sr.left - dr.left) - ta.scrollLeft, top: tr.top + (sr.top - dr.top) - ta.scrollTop, bottom: 0, height: lh };
+    r.bottom = r.top + lh;
+    div.remove();
+    return r;
+  }
+  const sel = window.getSelection();
+  if(sel && sel.rangeCount && !sel.isCollapsed) return sel.getRangeAt(0).getBoundingClientRect();
+  return null;
+}
+function hideSelBar(){
+  selState = { text: "", from: "" };
+  const root = document.getElementById("selRoot");
+  if(root) root.innerHTML = "";
+  const w = document.getElementById("selSpeakWrap");
+  if(w) w.innerHTML = "";
+}
+let selBarTimer = null;
+function selBarUpdate(){
+  if(selBarTimer) clearTimeout(selBarTimer);
+  selBarTimer = setTimeout(() => {
+    const root = document.getElementById("selRoot");
+    if(!root) return;
+    const modalOpen = !!document.querySelector("#modalRoot .sheet");
+    const s = (!SELBAR_ON || modalOpen || view !== "doc" || !currentId) ? null : selCurrentText();
+    const wrap = document.getElementById("selSpeakWrap");
+    if(!s || !s.text.trim()){ hideSelBar(); return; }
+    selState = { text: s.text, from: s.from };
+    if(wrap) wrap.innerHTML = `<button class="btn sub" onclick="speakSelection()">${t("spk_sel")}</button>`;
+    const q = s.text.trim();
+    const isWord = /^[A-Za-z][A-Za-z'’-]*$/.test(q);
+    root.innerHTML = `<div class="selbar" id="selBar">
+      <button onclick="selRelated()">${t("sel_related")}</button>
+      <button onclick="selWeb()">${t("sel_web")}</button>
+      ${isWord ? `<button onclick="selDict()">${t("sel_dict")}</button>` : ""}
+    </div>`;
+    const bar = document.getElementById("selBar");
+    const rect = selAnchorRect();
+    if(bar && rect){
+      const bw = bar.offsetWidth, bh = bar.offsetHeight;
+      let x = Math.min(Math.max(8, rect.left), window.innerWidth - bw - 8);
+      let y = rect.top - bh - 10;
+      if(y < 8) y = rect.bottom + 10;
+      if(y + bh > window.innerHeight - 8) y = Math.max(8, window.innerHeight - bh - 8);
+      bar.style.left = x + "px";
+      bar.style.top = y + "px";
+      bar.style.visibility = "visible";
+    }
+  }, 130);
+}
+document.addEventListener("selectionchange", () => selBarUpdate());
+function selQuery(){ return (selState.text || "").trim(); }
+function selRelated(){
+  const q = selQuery(); if(!q) return;
+  hideSelBar();
+  const ql = q.toLowerCase();
+  const hits = notes.filter(n => n.id !== currentId && (n.fm.title + "\n" + n.body + "\n" + n.fm.tags.join(" ")).toLowerCase().includes(ql));
+  openModal(`<h2>${t("sel_related")}</h2>
+  <p class="small">${t("sel_for").replace("{q}", esc(q.length > 40 ? q.slice(0, 40) + "…" : q))}</p>
+  ${hits.length ? hits.map(n => `<div class="relitem"><div class="ttl">${esc(n.fm.title)}</div><div class="small">${esc(excerptOf(parseBlocks(n.body), 60))}</div><div class="btnrow" style="margin:6px 0 0;"><button class="btn sub" style="min-height:44px;" onclick="closeModal(); view = 'doc'; openNote('${n.id}')">${t("open_btn")}</button></div></div>`).join("") : `<p class="small">${t("sel_none")}</p>`}
+  <div class="sheetfoot"><div class="btnrow" style="margin:0"><button class="btn ghost" onclick="closeModal()">${t("close_btn")}</button></div></div>`);
+}
+function selWeb(){
+  const q = selQuery(); if(!q) return;
+  window.open("https://www.google.com/search?q=" + encodeURIComponent(q), "_blank", "noopener");
+}
+function selDict(){
+  const q = selQuery(); if(!q) return;
+  window.open("https://ejje.weblio.jp/content/" + encodeURIComponent(q.toLowerCase()), "_blank", "noopener");
+}
 /* ============ 読み上げ（第13期） ============ */
 let ttsOn = false, ttsNoteId = null, ttsToken = 0;
-function ttsTextOf(n){
-  let b = n.body || "";
+function ttsStrip(b){
   b = b.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
   b = b.replace(/\[\[([^\]]+)\]\]/g, "$1");
   b = b.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
@@ -3112,7 +3261,10 @@ function ttsTextOf(n){
   b = b.replace(/\*\*([^*]+)\*\*/g, "$1").replace(/\*([^*]+)\*/g, "$1").replace(/_([^_]+)_/g, "$1");
   b = b.replace(/^\s*-{3,}\s*$/gm, "");
   b = b.replace(/\|/g, " ");
-  return (n.fm.title + "。\n" + b).replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return b;
+}
+function ttsTextOf(n){
+  return (n.fm.title + "。\n" + ttsStrip(n.body || "")).replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 }
 function ttsLangOf(text){
   if(/[ぁ-んァ-ヶ一-龠]/.test(text)) return "ja-JP";
@@ -3130,15 +3282,13 @@ function ttsChunks(text){
   if(cur.trim()) out.push(cur);
   return out.filter(x => x.trim());
 }
-function toggleSpeak(id){
-  if(ttsOn){ stopSpeak(); return; }
-  const n = getNote(id); if(!n) return;
+function speakText(text, noteId){
   if(!("speechSynthesis" in window)) return;
-  const text = ttsTextOf(n);
   if(!text) return;
   const lang = ttsLangOf(text);
   const chunks = ttsChunks(text);
-  ttsOn = true; ttsNoteId = id;
+  if(!chunks.length) return;
+  ttsOn = true; ttsNoteId = noteId;
   const my = ++ttsToken;
   refreshSpeakBtn();
   let i = 0;
@@ -3147,6 +3297,7 @@ function toggleSpeak(id){
     if(i >= chunks.length){ ttsOn = false; ttsNoteId = null; refreshSpeakBtn(); return; }
     const u = new SpeechSynthesisUtterance(chunks[i++]);
     u.lang = lang;
+    u.rate = ttsRate === "slow" ? 0.8 : 1.0;
     try{
       const vs = speechSynthesis.getVoices ? speechSynthesis.getVoices() : [];
       const v = vs.find(x => x.lang && x.lang.toLowerCase().startsWith(lang.slice(0, 2)));
@@ -3158,6 +3309,18 @@ function toggleSpeak(id){
   };
   try{ speechSynthesis.cancel(); }catch(e){ }
   next();
+}
+function toggleSpeak(id){
+  if(ttsOn){ stopSpeak(); return; }
+  const n = getNote(id); if(!n) return;
+  speakText(ttsTextOf(n), id);
+}
+function speakSelection(){
+  if(ttsOn){ stopSpeak(); return; }
+  const s = selCurrentText();
+  if(!s) return;
+  const text = ttsStrip(s.text).replace(/[ \t]+/g, " ").trim();
+  if(text) speakText(text, currentId);
 }
 function stopSpeak(){
   ttsToken++;
