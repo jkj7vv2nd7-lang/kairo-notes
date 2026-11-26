@@ -294,7 +294,7 @@ body[data-fs="xl"] .focusbody .fpreview{ font-size:24px; }
 <div id="printArea"></div>
 <script>
 "use strict";
-const APP_VER = "1.15.0";
+const APP_VER = "1.16.0";
 /* ============ ユーティリティ ============ */
 const $ = s => document.querySelector(s);
 function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
@@ -427,6 +427,7 @@ const STR = {
   cmp_print: ["🖨 まとめて印刷", "🖨 Print all"], cmp_print_toc: ["目次を付ける", "Include a table of contents"],
   today_past_lead: ["同じ月日のノートがあります：", "Notes from the same day in past years:"],
   today_btn: ["📅 今日のノート", "📅 Today's note"],
+  diary_btn: ["📖 今日の日記", "📖 Today's diary"],
   split_btn: ["✂️ 見出しで分割", "✂️ Split by headings"], split_title: ["✂️ 見出しで分割", "✂️ Split by headings"],
   split_lead: ["レベル2の見出し（##）ごとに、新しいノートを作ります。元のノートはそのまま残ります。", "A new note is made for each level-2 heading (##). The original note stays as it is."],
   split_lines: ["本文 {n} 行", "{n} lines of body"], split_run: ["{n} 件に分割する", "Split into {n} notes"],
@@ -999,6 +1000,7 @@ function docViewHtml(){
           <button class="btn sub" onclick="openExportAll()">${t("export_all_btn")}</button>
           <button class="btn sub" onclick="openCompile()">${t("cmp_btn")}</button>
           <button class="btn sub" onclick="openTodayNote()">${t("today_btn")}</button>
+          <button class="btn sub" onclick="openDiaryNote()">${t("diary_btn")}</button>
           <button class="btn sub" onclick="openMerge()">${t("merge_btn")}</button>
         </div>
         <div class="sortrow">
@@ -2115,8 +2117,8 @@ function aiSettingsCardHtml(){
   </div>`;
 }
 function settingsViewHtml(){
-  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。第15期では、選んで調べる選択バー、縦書きビュー、選択範囲の読み上げと速度切り替えが入りました。第16期では、全体点検（速度・英語表示・狭い画面・ボタンの大きさ）を行い、まとめ印刷、見本「Kairoの歩き方」の増補、今日のノートで過去の同じ月日を案内する小さな深化が入りました。";
-  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes. Phase 15 adds a selection lookup bar, a vertical reading view, and selection read-aloud with a speed toggle. Phase 16 is a polish pass: a full audit, compilation printing, more walk-through samples, and a small deepening of Today's Note.";
+  const aboutJa = "Kairo Note ver " + APP_VER + " ― MarkdownノートOS 第8期。記録と整理を分断しない、ローカルファーストのノートです。AI整理は「差分プレビュー → 承認 → 実行（ロールバック可）」の非破壊設計。手書きメモと音声メモも、AIの読み取り結果は必ず下書きとして確認してから保存します。本文の [[ノート名]] はプレビューでリンクになり、マップではノート同士のつながりが見えます。集中モードでは1つのノートだけを大きく表示して書けます。一覧の「今日の再会」には、しばらく開いていないノートが日替わりで出ます。外部AIとの受け渡しも差分確認つきです。第6期では、画面の言語（日本語／英語）の切り替え、文字サイズの調整、ノートのピン留め、選んだ文章の英訳サポート（AIキーがあるときだけ・下書き確認つき）が入りました。第7期では、広い画面（PC・タブレット）で上部にメニューが並び、ボタンに説明の吹き出しが出るようになりました。第8期では、Markdownの入力支援ボタン、見本ノート「Kairoの歩き方」、一覧の並び替え、AIの「問いかけ」（下書きから選んで挿入）が入りました。AIが考えている間は、経過時間と使い方のヒントが出る待ち画面になり、「やめる」で中断できます。第9期では、タグで選んだノート群を目次つきの1つの文書にまとめる「テーマ別まとめ書き出し」と、開いているノートをA4できれいに印刷する機能が入りました。第10期では、時間の流れに沿ってノートをたどる「回廊」と、まとめ書き出しのHTMLミニ本が入りました。第11期では、型（テンプレート）、AI要約・タイトル案、日付・時刻の挿入ボタンが入りました。第12期では、全ノートのバックアップと復元、バックアップのリマインド、表の挿入支援が入りました。第13期では、ノートの読み上げ、手書きの色ペンとマーカー、複数ノートを選ぶAI相談が入りました。第14期では、今日のノート、見出しで分割と結合、表の編集支援、関連メモのその場プレビューが入りました。第15期では、選んで調べる選択バー、縦書きビュー、選択範囲の読み上げと速度切り替えが入りました。第16期では、全体点検（速度・英語表示・狭い画面・ボタンの大きさ）を行い、まとめ印刷、見本「Kairoの歩き方」の増補、今日のノートで過去の同じ月日を案内する小さな深化が入りました。第17期では、日付・今日の一言・今日の一枚だけの小さな「今日の日記」ひな形が入りました。";
+  const aboutEn = "Kairo Note ver " + APP_VER + " — a local-first Markdown note OS that never divides capture from organizing. AI organizing is non-destructive: diff preview, approval, then execution with rollback. Handwriting and voice AI results are always drafts until you approve them. [[Note titles]] become links in the preview, and the map shows how notes connect. Focus mode shows one note, large. The list's Rediscover card brings back notes you have not opened for a while. Phase 6 adds interface language (Japanese / English), text size, pinned notes, and translation of selected text (AI key required, draft-first). Phase 7 adds a top menu with explanatory tooltips on wide screens (PC and tablets). Phase 8 adds Markdown helper buttons, the Walking with Kairo sample set, list sorting, and AI Questions (insert only the ones you pick). While the AI is thinking, a waiting screen shows the elapsed time and usage tips, and you can stop the request. Phase 9 adds compilation export (notes picked by tag, combined into one document with a table of contents) and clean A4 printing of the open note. Phase 10 adds the Corridor, a walk through notes along the flow of time, and HTML mini-books in the compilation export. Phase 11 adds templates, AI summary and title ideas, and date/time insertion buttons. Phase 12 adds full backup and restore, a gentle backup reminder, and table insertion. Phase 13 adds read-aloud, pen colors and a marker for handwriting, and AI consultation over several notes. Phase 14 adds Today's Note, split and merge, table editing tools, and in-place previews of related notes. Phase 15 adds a selection lookup bar, a vertical reading view, and selection read-aloud with a speed toggle. Phase 16 is a polish pass: a full audit, compilation printing, more walk-through samples, and a small deepening of Today's Note. Phase 17 adds a small Today's Diary template with just three fields: the date, one line for today, and one photo of the day.";
   return `<h2 style="margin:4px 0 12px;">${t("settings_title")}</h2>
   <div class="card">
     <h2>${t("disp_title")}</h2>
@@ -2992,6 +2994,23 @@ async function openTodayNote(){
   todayPastClosed = false;
   if(todayPast.length) renderEditor();
 }
+/* ============ 今日の日記ひな形（第17期） ============ */
+function diaryTitle(){ return todayText() + (LANG === "ja" ? "の日記" : " — Diary"); }
+function diaryBody(){
+  const d = new Date();
+  if(LANG === "ja"){
+    const wd = ["日", "月", "火", "水", "木", "金", "土"][d.getDay()];
+    return "**日付**：" + todayText() + "（" + wd + "）\n\n## 今日の一言\n\n\n## 今日の一枚\n\n（写真を貼るか、今日の出来事をひとつ書いてください）\n";
+  }
+  const wd = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][d.getDay()];
+  return "**Date**: " + todayText() + " (" + wd + ")\n\n## One line for today\n\n\n## One photo of the day\n\n(Attach a photo, or write one moment from today.)\n";
+}
+async function openDiaryNote(){
+  const title = diaryTitle();
+  const ex = notes.find(n => n.fm.title === title);
+  const target = ex || await createNote(title, diaryBody(), [LANG === "ja" ? "日記" : "diary"], "doing");
+  view = "doc"; openNote(target.id);
+}
 async function copyImagesForBody(ownerId, body){
   const refs = [...new Set([...body.matchAll(/kairo-img:([a-z0-9]+)/g)].map(m => m[1]))];
   let out = body;
@@ -3771,6 +3790,7 @@ function openCreateMenu(){
   openModal(`<h2>${t("create_title")}</h2>
   <div class="btnrow" style="flex-direction:column;">
     <button class="btn" onclick="closeModal(); openTodayNote();">${t("today_btn")}</button>
+    <button class="btn sub" onclick="closeModal(); openDiaryNote();">${t("diary_btn")}</button>
     <button class="btn sub" onclick="closeModal(); newNote();">${t("create_text")}</button>
     <button class="btn sub" onclick="openPad('new')">${t("create_ink")}</button>
     <button class="btn sub" onclick="openVoice()">${t("create_voice")}</button>
